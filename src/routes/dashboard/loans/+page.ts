@@ -62,7 +62,6 @@ export const load: PageLoad = async ({ url }) => {
 			selectedLoanId: loanIdParam
 		};
 	} catch (error) {
-		console.error('Failed to load loans:', error);
 		return {
 			loans: [],
 			stats: {

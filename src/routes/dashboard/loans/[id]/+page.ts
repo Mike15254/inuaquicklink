@@ -29,9 +29,6 @@ export const load: PageLoad = async ({ params }) => {
 			getLoanPayments(loanId, permissions),
 			getEmailLogsForLoan(loanId)
 		]);
-		console.log('Loan details:', loan);
-		console.log('Loan payments:', payments);
-		console.log('Email logs:', emails);
 
 		return {
 			loan,
@@ -40,7 +37,6 @@ export const load: PageLoad = async ({ params }) => {
 			loanId
 		};
 	} catch (error) {
-		console.error('Failed to load loan details:', error);
 		return {
 			loan: null,
 			payments: [],

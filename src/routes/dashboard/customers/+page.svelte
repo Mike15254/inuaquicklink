@@ -108,7 +108,6 @@
 			customers = [...customers, ...result.items];
 			currentPage = nextPage;
 		} catch (error) {
-			console.error('Failed to load more customers:', error);
 		} finally {
 			isLoadingMore = false;
 		}

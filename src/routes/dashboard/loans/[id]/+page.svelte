@@ -124,7 +124,6 @@
 			emails = updatedEmails;
 			approveAmount = updatedLoan.loan_amount || 0;
 		} catch (error) {
-			console.error('Failed to refresh loan:', error);
 			toast.error('Failed to refresh loan data');
 		} finally {
 			isLoading = false;

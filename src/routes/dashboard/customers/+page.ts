@@ -51,7 +51,6 @@ export const load: PageLoad = async ({ url }) => {
 			statusFilter: statusParam
 		};
 	} catch (error) {
-		console.error('Failed to load customers:', error);
 		return {
 			customers: [],
 			stats: { total: 0, active: 0, blocked: 0, pending: 0 },

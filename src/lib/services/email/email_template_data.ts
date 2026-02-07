@@ -72,7 +72,7 @@ export async function updateEmailTemplate(
 
         return result;
     } catch (error) {
-        console.error('[updateEmailTemplate] Failed to update template:', error);
+        // console.error('[updateEmailTemplate] Failed to update template:', error);
         throw error;
     }
 }

@@ -260,7 +260,7 @@
 										otpId = result.data.otpId;
 									}
 								} catch (error) {
-									console.error('Failed to resend OTP:', error);
+									// console.error('Failed to resend OTP:', error);
 								} finally {
 									resendLoading = false;
 								}

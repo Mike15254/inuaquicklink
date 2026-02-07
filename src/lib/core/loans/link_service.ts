@@ -35,12 +35,6 @@ function extractPocketBaseError(error: unknown): string {
 		status?: number;
 	};
 
-	// Log the full error for debugging
-	console.log('[LinkService] Full PocketBase error:', JSON.stringify(pbError, null, 2));
-	console.log('[LinkService] Error response:', pbError.response);
-	console.log('[LinkService] Error response data:', pbError.response?.data);
-
-	// Check for field-specific validation errors
 	if (pbError.response?.data && typeof pbError.response.data === 'object') {
 		const fieldErrors = Object.entries(pbError.response.data)
 			.map(([field, err]) => {
@@ -100,15 +94,6 @@ export async function createApplicationLink(
 	userId: string,
 	userPermissions: UserPermissions
 ): Promise<ApplicationLinksResponse> {
-	// Debug: Log incoming permissions
-	console.log('[LinkService] createApplicationLink called:', {
-		userId,
-		permissionsCount: userPermissions?.length ?? 0,
-		hasLinksCreate: userPermissions?.includes('links.create'),
-		requiredPermission: Permission.LINKS_CREATE,
-		permissions: userPermissions
-	});
-
 	// Check for LINKS_CREATE permission (application-level check)
 	assertPermission(userPermissions, Permission.LINKS_CREATE);
 
@@ -130,45 +115,18 @@ export async function createApplicationLink(
 		linkData.customer = input.customerId;
 	}
 
-	console.log('[LinkService] Creating application link:', {
-		userId,
-		customerId: input.customerId || 'none',
-		expiryMinutes,
-		expiresAt: expiryDate.toISOString(),
-		linkData
-	});
-
-	// Debug: Check auth state before making request
-	console.log('[LinkService] Auth state:', {
-		isValid: pb.authStore.isValid,
-		hasToken: !!pb.authStore.token,
-		tokenPrefix: pb.authStore.token?.substring(0, 20) + '...',
-		recordId: pb.authStore.record?.id,
-		recordCollection: pb.authStore.record?.collectionName
-	});
-
 	try {
 		const link = await pb.collection(Collections.ApplicationLinks).create<ApplicationLinksResponse>(linkData);
-
-		console.log('[LinkService] Link created successfully:', link.id);
-
-		// Log activity (don't fail if logging fails)
-		try {
+try {
 			await logLinkCreated(link.id, userId, input.customerId);
 		} catch (logError) {
-			console.warn('[LinkService] Failed to log link creation:', logError);
+			// console.warn('[LinkService] Failed to log link creation:', logError);
 		}
 
 		return link;
 	} catch (error) {
 		const errorMessage = extractPocketBaseError(error);
-		
-		console.error('[LinkService] Failed to create application link:', {
-			error: errorMessage,
-			userId,
-			customerId: input.customerId,
-			rawError: error
-		});
+	
 
 		// Check if it's a permission error from PocketBase (403)
 		const pbError = error as { status?: number };

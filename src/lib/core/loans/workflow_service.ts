@@ -58,23 +58,19 @@ async function getCustomerFromLoan(
 		const expandObj = loan.expand as Record<string, unknown>;
 		if (expandObj.customer && typeof expandObj.customer === 'object') {
 			customer = expandObj.customer as CustomersResponse;
-			console.log(`[${context}] Customer found in expand:`, customer.id, customer.name);
 		}
 	}
 	
 	// Fallback: fetch customer directly if expand is missing
 	if (!customer && loan.customer) {
-		console.log(`[${context}] Customer not in expand, fetching by ID: ${loan.customer}`);
 		try {
 			customer = await getCustomerById(loan.customer);
-			console.log(`[${context}] Customer fetched successfully:`, customer.id, customer.name);
 		} catch (e) {
-			console.error(`[${context}] Failed to fetch customer ${loan.customer}:`, e);
+			// console.error(`[${context}] Failed to fetch customer ${loan.customer}:`, e);
 		}
 	}
 	
 	if (!customer) {
-		console.error(`[${context}] Customer not found. Loan customer ID: ${loan.customer}`);
 		throw new NotFoundError('Customer', loan.customer);
 	}
 	
@@ -165,13 +161,7 @@ export async function approveWithAmount(
 	assertPermission(userPermissions, Permission.LOANS_APPROVE);
 
 	const loan = await getLoanById(input.loanId);
-	
-	console.log(`[approveWithAmount] Loan fetched:`, {
-		id: loan.id,
-		customerId: loan.customer,
-		hasExpand: !!loan.expand,
-		expandKeys: loan.expand ? Object.keys(loan.expand) : []
-	});
+
 
 	if (loan.status !== LoansStatusOptions.pending) {
 		throw new ForbiddenError(`Cannot approve loan with status '${loan.status}'`);
@@ -365,7 +355,7 @@ export async function disburseFunds(
 	try {
 		await incrementCustomerLoans(loan.customer, loan.loan_amount);
 	} catch (error) {
-		console.warn(`[disburseFunds] Failed to update customer loan stats for customer ${loan.customer}:`, error);
+		// console.warn(`[disburseFunds] Failed to update customer loan stats for customer ${loan.customer}:`, error);
 		// Don't fail the disbursement if stats update fails, but log it
 	}
 
@@ -388,7 +378,7 @@ export async function disburseFunds(
 	try {
 		await sendDisbursementEmail(updatedLoan, customer);
 	} catch (error) {
-		console.warn(`[disburseFunds] Failed to send disbursement email for loan ${loan.id}:`, error);
+		// console.warn(`[disburseFunds] Failed to send disbursement email for loan ${loan.id}:`, error);
 	}
 
 	return updatedLoan;
@@ -479,7 +469,7 @@ export async function waivePenalty(
 			);
 		}
 	} catch (error) {
-		console.warn('Failed to send penalty waiver email:', error);
+		// console.warn('Failed to send penalty waiver email:', error);
 	}
 
 	return updatedLoan;
@@ -622,7 +612,7 @@ export async function closeLoanAsWriteOff(
 			);
 		}
 	} catch (error) {
-		console.warn('Failed to send loan closure email:', error);
+		// console.warn('Failed to send loan closure email:', error);
 	}
 
 	return updatedLoan;
@@ -797,7 +787,7 @@ async function sendPaymentConfirmationEmail(
 			);
 		}
 	} catch (error) {
-		console.error('Failed to send payment confirmation email:', error);
+		// console.error('Failed to send payment confirmation email:', error);
 	}
 }
 /**
@@ -808,7 +798,7 @@ async function sendApprovalEmail(
 	customer: CustomersResponse
 ): Promise<void> {
 	// Template not provided in current setup, skipping email or implement LOAN_APPROVED if needed
-	console.log(`[sendApprovalEmail] Skipping approval email for loan ${loan.loan_number} (no template configured)`);
+	// console.log(`[sendApprovalEmail] Skipping approval email for loan ${loan.loan_number} (no template configured)`);
 }
 
 /**
@@ -837,7 +827,7 @@ async function sendRejectionEmail(
 			}
 		);
 	} catch (error) {
-		console.error('Failed to send rejection email:', error);
+		// console.error('Failed to send rejection email:', error);
 	}
 }
 
@@ -868,7 +858,7 @@ async function sendDisbursementEmail(
 
 		const compiled = await compileEmailTemplate(TEMPLATE_KEYS.LOAN_DISBURSED, vars);
 		if (!compiled) {
-			console.warn(`Disbursement template ${TEMPLATE_KEYS.LOAN_DISBURSED} not found`);
+			// console.warn(`Disbursement template ${TEMPLATE_KEYS.LOAN_DISBURSED} not found`);
 			return;
 		}
 
@@ -923,7 +913,7 @@ async function sendDisbursementEmail(
 				pdfBuffer = Buffer.from(pdfArrayBuffer);
 			}
 		} catch (pdfError) {
-			console.error('[sendDisbursementEmail] PDF Generation failed:', pdfError);
+			// console.error('[sendDisbursementEmail] PDF Generation failed:', pdfError);
 		}
 
 		if (pdfBuffer) {
@@ -944,7 +934,6 @@ async function sendDisbursementEmail(
 				}
 			);
 		} else {
-			console.warn('[sendDisbursementEmail] Sending email WITHOUT PDF due to generation failure');
 			await sendTemplateEmail(
 				TEMPLATE_KEYS.LOAN_DISBURSED,
 				customer.email,
@@ -957,7 +946,7 @@ async function sendDisbursementEmail(
 			);
 		}
 	} catch (error) {
-		console.error('Failed to send disbursement email:', error);
+		// console.error('Failed to send disbursement email:', error);
 	}
 }
 

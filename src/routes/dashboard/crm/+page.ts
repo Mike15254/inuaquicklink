@@ -67,7 +67,6 @@ export const load: PageLoad = async ({ url }) => {
 			recentEmails: recentEmails.items
 		};
 	} catch (error) {
-		console.error('Failed to load CRM data:', error);
 		return {
 			stats: {
 				customersNeedingFollowUp: 0,

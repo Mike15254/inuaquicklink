@@ -153,8 +153,6 @@ export async function getProfitabilityMetrics(
 ): Promise<ProfitabilityMetrics> {
 	const dateRange = getDateRangeForPeriod(period, customRange);
 
-	console.log('💹 [PROFITABILITY DEBUG] ==================');
-
 	const [disbursedLoans, allLoans, payments] = await Promise.all([
 		fetchDisbursedLoansInRange(dateRange),
 		fetchLoansInRange(dateRange),
@@ -164,31 +162,16 @@ export async function getProfitabilityMetrics(
 	// Calculate revenue from all loans with payments (not just fully repaid)
 	const loansWithPayments = allLoans.filter((l) => (l.amount_paid || 0) > 0);
 	
-	console.log('📦 Loans with Payments:', loansWithPayments.length, 'out of', allLoans.length, 'total loans');
-	
 	const interestIncome = loansWithPayments.reduce((sum, l) => sum + (l.interest_amount || 0), 0);
 	const feeIncome = disbursedLoans.reduce((sum, l) => sum + (l.processing_fee || 0), 0);
 	const penaltyIncome = loansWithPayments.reduce((sum, l) => sum + (l.penalty_amount || 0), 0);
 	const grossRevenue = interestIncome + feeIncome + penaltyIncome;
-
-	console.log('💰 Revenue Breakdown:');
-	console.log('  - Interest Income:', interestIncome);
-	console.log('  - Fee Income:', feeIncome);
-	console.log('  - Penalty Income:', penaltyIncome);
-	console.log('  - Gross Revenue:', grossRevenue);
 
 	const totalDisbursed = disbursedLoans.reduce((sum, l) => sum + (l.disbursement_amount || 0), 0);
 	const totalCollected = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
 	const netIncome = totalCollected - totalDisbursed;
 	const profitMargin = totalCollected > 0 ? (netIncome / totalCollected) * 100 : 0;
-
-	console.log('📊 Net Calculations:');
-	console.log('  - Total Disbursed:', totalDisbursed);
-	console.log('  - Total Collected:', totalCollected);
-	console.log('  - Net Income:', netIncome);
-	console.log('  - Profit Margin:', profitMargin.toFixed(2) + '%');
-	console.log('==================\n');
 
 	const avgLoanSize =
 		disbursedLoans.length > 0
@@ -506,7 +489,7 @@ export async function getRecentTransactions(
 			type: 'disbursement',
 			loanId: loan.id,
 			loanNumber: loan.loan_number,
-			customerPhotoUrl: customer.avatar ? pb.files.getUrl(customer, customer.avatar) : undefined,
+			customerPhotoUrl: customer.avatar ? pb.files.getURL(customer, customer.avatar) : undefined,
 			recorderName: disburser.name || 'System'
 		});
 	}
@@ -527,7 +510,7 @@ export async function getRecentTransactions(
 			type: 'payment',
 			loanId: payment.loan || '',
 			loanNumber: loan.loan_number,
-			customerPhotoUrl: customer.avatar ? pb.files.getUrl(customer, customer.avatar) : undefined,
+			customerPhotoUrl: customer.avatar ? pb.files.getURL(customer, customer.avatar) : undefined,
 			recorderName: recorder.name || 'System'
 		});
 	}

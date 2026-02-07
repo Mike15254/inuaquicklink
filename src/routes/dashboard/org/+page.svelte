@@ -107,7 +107,7 @@
 			return URL.createObjectURL(profileForm.logo);
 		}
 		if (org?.logo) {
-			return pb.files.getUrl(org, org.logo);
+			return pb.files.getURL(org, org.logo);
 		}
 		return null;
 	}
@@ -295,7 +295,7 @@
 											type="file"
 											accept="image/*"
 											onchange={handleFileSelect}
-											class="max-w-62.5"
+											class="max-w-[250px]"
 										/>
 									{/if}
 								</div>
@@ -457,7 +457,7 @@
 												<div class="relative h-8 w-8 overflow-hidden rounded-full bg-muted">
 													{#if user.avatar}
 														<img
-															src={pb.files.getUrl(user, user.avatar)}
+															src={pb.files.getURL(user, user.avatar)}
 															alt={user.name}
 															class="h-full w-full object-cover"
 														/>

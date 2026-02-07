@@ -5,8 +5,6 @@ import { pb } from '$lib/infra/db/pb';
 
 // Initialize SMTP config on server startup
 (() => {
-	console.log('[hooks.server] Initializing application...');
-
 	const smtpSettings = {
 		host: env.SMTP_HOST,
 		port: env.SMTP_PORT ? parseInt(env.SMTP_PORT) : undefined,
@@ -22,13 +20,10 @@ import { pb } from '$lib/infra/db/pb';
 	);
 
 	if (Object.keys(cleanSettings).length > 0) {
-		console.log('[hooks.server] Configuring SMTP with environment variables:', Object.keys(cleanSettings));
-		if (!cleanSettings.host) {
-			console.warn('[hooks.server] WARNING: SMTP_HOST is missing or empty!');
-		}
+	
 		configureSmtp(cleanSettings);
 	} else {
-		console.warn('[hooks.server] WARNING: No SMTP environment variables found in $env/dynamic/private');
+		// console.warn('[hooks.server] WARNING: No SMTP environment variables found in $env/dynamic/private');
 	}
 })();
 
@@ -51,8 +46,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 			event.locals.user = pb.authStore.model;
 			event.locals.token = pb.authStore.token;
 		} catch (error) {
-			console.warn('[hooks.server] Failed to parse auth cookie:', error);
-			// Clear invalid cookie
 			event.cookies.delete('pb_auth', { path: '/' });
 		}
 	}

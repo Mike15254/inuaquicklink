@@ -73,10 +73,6 @@ export async function createLoan(
 	input: CreateLoanInput,
 	settings: LoanCalculationSettings = DEFAULT_LOAN_SETTINGS
 ): Promise<LoansResponse> {
-	console.log('[createLoan] Input:', JSON.stringify(input, null, 2));
-	console.log('[createLoan] Settings:', JSON.stringify(settings, null, 2));
-
-	// Calculate loan details
 	const calculation = calculateLoan(input.loanAmount, input.salaryDate, settings);
 
 	// Validate loan period
@@ -90,10 +86,6 @@ export async function createLoan(
 
 	// Generate loan number
 	const loanNumber = generateLoanNumber();
-
-	// Create loan record
-	// Create loan record (Note: dates like due_date, disbursement_date are set to "" or null initially to avoid autodate defaults if schema allows)
-	// IMPORTANT: The PocketBase schema for these dates MUST NOT be 'autodate' with 'onCreate: true' for this to work correctly.
 	const loanData = {
 		loan_number: loanNumber,
 		customer: input.customerId,
@@ -109,10 +101,10 @@ export async function createLoan(
 		application_date: nowISO(),
 		// We set due_date based on calculation, but for pending loans it might change upon approval/disbursement
 		// However, keeping it calculated is fine as an estimate.
-		due_date: calculation.dueDate.toISOString(), 
+		due_date: calculation.dueDate.toISOString(),
 		status: LoansStatusOptions.pending,
 		disbursement_method: input.disbursementMethod,
-		
+
 		// Initialize other dates to empty/null to prevent 'now' default if schema allows
 		// IMPORTANT: These fields must be of type 'Date' in PocketBase, NOT 'Autodate'.
 		// 'Autodate' fields (with onCreate: true) will automatically set to NOW, overwriting these nulls.
@@ -126,13 +118,17 @@ export async function createLoan(
 		waiver_date: null,
 
 		// Only include mpesa_number if using mpesa, otherwise omit - normalize to E.164 format
-		...(input.disbursementMethod === 'mpesa' && input.mpesaNumber ? { mpesa_number: normalizePhone(input.mpesaNumber) } : {}),
+		...(input.disbursementMethod === 'mpesa' && input.mpesaNumber
+			? { mpesa_number: normalizePhone(input.mpesaNumber) }
+			: {}),
 		// Only include bank details if using bank_transfer
-		...(input.disbursementMethod === 'bank_transfer' ? {
-			bank_name: input.bankName || '',
-			bank_account: input.bankAccount || '',
-			account_name: input.accountName || ''
-		} : {}),
+		...(input.disbursementMethod === 'bank_transfer'
+			? {
+					bank_name: input.bankName || '',
+					bank_account: input.bankAccount || '',
+					account_name: input.accountName || ''
+				}
+			: {}),
 		digital_signature: input.digitalSignature,
 		amount_paid: 0,
 		balance: calculation.totalRepayment,
@@ -140,16 +136,12 @@ export async function createLoan(
 		days_overdue: 0
 	};
 
-	console.log('[createLoan] Creating loan with data:', JSON.stringify(loanData, null, 2));
-
 	let loan: LoansResponse;
 	try {
 		loan = await pb.collection(Collections.Loans).create<LoansResponse>(loanData);
-		console.log('[createLoan] Loan created successfully:', loan.id);
 	} catch (error) {
-		console.error('[createLoan] PocketBase error:', error);
 		if (error && typeof error === 'object' && 'response' in error) {
-			console.error('[createLoan] PocketBase response:', JSON.stringify((error as any).response, null, 2));
+			// console.error('[createLoan] PocketBase response:', JSON.stringify((error as any).response, null, 2));
 		}
 		throw error;
 	}

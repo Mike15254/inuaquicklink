@@ -103,7 +103,6 @@ export async function triggerCronJob(
 			});
 		}
 	} catch (error) {
-		console.error('Failed to log cron job result:', error);
 	}
 
 	return result;

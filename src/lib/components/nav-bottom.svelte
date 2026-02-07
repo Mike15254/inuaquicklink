@@ -77,7 +77,7 @@
 	let navData = $derived(getNavData());
 	let orgLogo = $derived(
 		session.organization?.logo
-			? pb.files.getUrl(session.organization, session.organization.logo)
+			? pb.files.getURL(session.organization, session.organization.logo)
 			: null
 	);
 </script>

@@ -54,12 +54,12 @@ interface LoanSettings {
  */
 async function fetchLoanSettings(): Promise<LoanSettings> {
 	try {
-		console.log('[fetchLoanSettings] Fetching loan settings...');
+		// console.log('[fetchLoanSettings] Fetching loan settings...');
 		const settings = await pb
 			.collection(Collections.LoanSettings)
 			.getFullList<LoanSettingsResponse>();
 
-		console.log('[fetchLoanSettings] Found settings:', settings.length, 'records');
+		// console.log('[fetchLoanSettings] Found settings:', settings.length, 'records');
 
 		if (settings.length > 0) {
 			const s = settings[0];
@@ -74,11 +74,11 @@ async function fetchLoanSettings(): Promise<LoanSettings> {
 				gracePeriodDays: s.grace_period_days ?? DEFAULT_LOAN_SETTINGS.gracePeriodDays,
 				penaltyPeriodDays: s.penalty_period_days ?? DEFAULT_LOAN_SETTINGS.penaltyPeriodDays
 			};
-			console.log('[fetchLoanSettings] Using DB settings:', result);
+			// console.log('[fetchLoanSettings] Using DB settings:', result);
 			return result;
 		}
 	} catch (error) {
-		console.error('[fetchLoanSettings] Error fetching settings:', error);
+		// console.error('[fetchLoanSettings] Error fetching settings:', error);
 	}
 
 	return {
@@ -147,7 +147,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			organization = orgs.items[0];
 		}
 	} catch (e) {
-		console.warn('Failed to fetch organization details:', e);
+		// console.warn('Failed to fetch organization details:', e);
 	}
 
 	return {
@@ -159,23 +159,19 @@ export const load: PageServerLoad = async ({ url }) => {
 
 export const actions: Actions = {
 	default: async ({ request, getClientAddress }) => {
-		console.log('[apply/default] ====== FORM SUBMISSION RECEIVED ======');
+		// console.log('[apply/default] ====== FORM SUBMISSION RECEIVED ======');
 		const formData = await request.formData();
 
 		// Log form data keys for debugging
 		const formKeys = Array.from(formData.keys());
-		console.log('[apply/default] Form data keys:', formKeys);
+		// console.log('[apply/default] Form data keys:', formKeys);
 
 		// Re-validate token on submission
 		const token = formData.get('token') as string;
-		console.log('[apply/default] Token:', token ? token.substring(0, 20) + '...' : 'MISSING');
+		// console.log('[apply/default] Token:', token ? token.substring(0, 20) + '...' : 'MISSING');
 		
 		const tokenState = await validateApplicationToken(token);
-		console.log('[apply/default] Token validation result:', {
-			valid: tokenState.valid,
-			linkId: tokenState.linkId,
-			error: tokenState.error
-		});
+		
 
 		if (!tokenState.valid || !tokenState.linkId) {
 			return fail(400, {
@@ -349,23 +345,13 @@ export const actions: Actions = {
 			const fullName = middleName
 				? `${firstName} ${middleName} ${lastName}`
 				: `${firstName} ${lastName}`;
-
-			// Use 2-field matching logic to find existing customer
-			// This matches customers only if 2 unique identifiers match (email+phone OR id+phone OR id+email)
 			let customerId: string;
-			console.log('[apply/default] Looking for existing customer with 2-field match:', {
-				nationalId,
-				email: normalizeEmail(email),
-				phone: normalizePhone(phoneNumber)
-			});
 
 			const existingCustomer = await findExistingCustomerByMatch(nationalId, email, phoneNumber);
 
 			if (existingCustomer) {
 				customerId = existingCustomer.id;
-				console.log('[apply/default] Found existing customer (2-field match):', customerId, '- Name:', existingCustomer.name);
-			} else {
-				console.log('[apply/default] No 2-field match found, creating new customer...');
+					} else {
 				const customerInput: CreateCustomerInput = {
 					name: fullName,
 					email: normalizeEmail(email),
@@ -380,8 +366,7 @@ export const actions: Actions = {
 
 				const newCustomer = await createCustomer(customerInput);
 				customerId = newCustomer.id;
-				console.log('[apply/default] Created new customer:', customerId, '- Name:', fullName);
-			}
+					}
 
 			// Create loan
 			const loanInput: CreateLoanInput = {
@@ -399,10 +384,6 @@ export const actions: Actions = {
 				ipAddress: getClientAddress(),
 				userAgent: request.headers.get('user-agent') || undefined
 			};
-
-			console.log('[apply/default] Creating loan with input:', JSON.stringify(loanInput, null, 2));
-
-			// Convert settings to calculation format
 			const calcSettings: LoanCalculationSettings = {
 				interestRate15Days: loanSettings.interestRate15Days,
 				interestRate30Days: loanSettings.interestRate30Days,
@@ -414,15 +395,8 @@ export const actions: Actions = {
 				gracePeriodDays: loanSettings.gracePeriodDays,
 				penaltyPeriodDays: loanSettings.penaltyPeriodDays
 			};
+	const loan = await createLoan(loanInput, calcSettings);
 
-			console.log('[apply/default] Using loan settings:', JSON.stringify(calcSettings, null, 2));
-
-			const loan = await createLoan(loanInput, calcSettings);
-
-		console.log('[apply/default] Loan created successfully:', loan.id);
-
-		// Link already-uploaded documents to this loan
-		// Documents were uploaded in real-time, now we just need to update their loan field
 		const documentIds = [
 			nationalIdFrontId,
 			nationalIdBackId,
@@ -432,17 +406,12 @@ export const actions: Actions = {
 			postDatedChequeId
 		].filter(Boolean); // Remove any empty strings
 
-		console.log('[apply/default] Linking', documentIds.length, 'documents to loan');
-
-		// Update each document to link it to the loan
 		for (const documentId of documentIds) {
 			try {
 				await pb.collection(Collections.LoanDocuments).update(documentId, {
 					loan: loan.id
-				});
-				console.log(`[apply/default] Linked document ${documentId} to loan ${loan.id}`);
-			} catch (docError) {
-				console.error(`[apply/default] Failed to link document ${documentId}:`, docError);
+				});} catch (docError) {
+				// console.error(`[apply/default] Failed to link document ${documentId}:`, docError);
 				// Continue with other documents even if one fails
 			}
 		}
@@ -450,7 +419,7 @@ export const actions: Actions = {
 			// Send application received confirmation email
 			try {
 				// Fetch organization details for email
-				let orgName = 'inuaquicklink Loans';
+				let orgName = 'inuaquicklink';
 				let orgPhone = '+254 700 000 000';
 				let orgEmail = 'support@inuaquicklink.com';
 
@@ -462,7 +431,7 @@ export const actions: Actions = {
 						orgEmail = orgs[0].email || orgEmail;
 					}
 				} catch (orgError) {
-					console.warn('[apply/default] Could not fetch organization details:', orgError);
+					// console.warn('[apply/default] Could not fetch organization details:', orgError);
 				}
 
 				// Construct full customer name
@@ -486,13 +455,11 @@ export const actions: Actions = {
 				});
 
 				if (emailResult.success) {
-					console.log('[apply/default] Confirmation email sent successfully:', emailResult.emailLogId);
+					// console.log('[apply/default] Confirmation email sent successfully:', emailResult.emailLogId);
 				} else {
-					console.warn('[apply/default] Failed to send confirmation email:', emailResult.error);
+					// console.warn('[apply/default] Failed to send confirmation email:', emailResult.error);
 				}
 			} catch (emailError) {
-				// Don't fail the application submission if email fails
-				console.error('[apply/default] Error sending confirmation email:', emailError);
 			}
 
 			return {
@@ -501,9 +468,7 @@ export const actions: Actions = {
 				message: 'Your loan application has been submitted successfully. We will review your application and get back to you shortly.'
 			};
 		} catch (error) {
-			console.error('[apply/default] Application submission error:', error);
-
-			// Generic error message for any submission failures
+		
 			return fail(500, {
 				success: false,
 				errors: {

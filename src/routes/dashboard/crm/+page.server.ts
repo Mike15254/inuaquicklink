@@ -49,7 +49,6 @@ export const actions: Actions = {
 				});
 			}
 		} catch (error) {
-			console.error('[crm/sendEmail] Error:', error);
 			return fail(500, {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'

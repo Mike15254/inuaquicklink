@@ -52,21 +52,12 @@ export async function logEmailToDb(
 		error_message: errorMessage || ''
 	};
 
-	console.log('[logEmailToDb] Creating email log with:', JSON.stringify(emailData, (key, value) => {
-		// Truncate body for logging
-		if (key === 'body' && typeof value === 'string') return value.substring(0, 100) + '...';
-		return value;
-	}, 2));
-
 	try {
 		const emailLog = await pb.collection(Collections.EmailLogs).create<EmailLogsResponse>(emailData);
-		console.log('[logEmailToDb] Email log created:', emailLog.id);
+		// console.log('[logEmailToDb] Email log created:', emailLog.id);
 		return emailLog;
 	} catch (error) {
-		console.error('[logEmailToDb] Failed to create email log:', error);
-		if (error && typeof error === 'object' && 'response' in error) {
-			console.error('[logEmailToDb] PocketBase response:', JSON.stringify((error as { response: unknown }).response, null, 2));
-		}
+		
 		throw error;
 	}
 }

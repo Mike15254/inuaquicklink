@@ -1,12 +1,12 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { session } from '$lib/store/session.svelte';
 	import { pb } from '$lib/infra/db/pb';
+	import { session } from '$lib/store/session.svelte';
 
-	let orgName = $derived(session.organization?.name || 'inuaquicklink');
+	let orgName = $derived(session.organization?.name);
 	let orgLogo = $derived(
 		session.organization?.logo
-			? pb.files.getUrl(session.organization, session.organization.logo)
+			? pb.files.getURL(session.organization, session.organization.logo)
 			: '/favicon.png'
 	);
 </script>

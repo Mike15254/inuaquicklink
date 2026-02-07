@@ -102,13 +102,6 @@ export function initSession(
 	if (token && user && !pb.authStore.isValid) {
 		pb.authStore.save(token, user);
 	}
-
-	console.log('[Session] Session initialized:', {
-		userId: user.id,
-		userName: user.name || user.email,
-		orgCode: organization.code,
-		permissions: session.permissions.length
-	});
 }
 
 /**
@@ -118,31 +111,31 @@ export function initSession(
 export function restoreSession(): void {
 	// Check if PocketBase already has a valid auth state from localStorage
 	if (!pb.authStore.isValid || !pb.authStore.record) {
-		console.log('[Session] No valid PocketBase auth found in localStorage');
+		// console.log('[Session] No valid PocketBase auth found in localStorage');
 		session.isLoading = false;
 		return;
 	}
 
 	try {
 		const record = pb.authStore.record as any;
-		console.log('[Session] Found PocketBase auth, record ID:', record.id);
+		// console.log('[Session] Found PocketBase auth, record ID:', record.id);
 		
 		// Check if we already have the expanded data in the record
 		if (record.expand?.role && record.expand?.organization) {
-			console.log('[Session] Using expanded data from PocketBase record');
+			// console.log('[Session] Using expanded data from PocketBase record');
 			
 			const user = record as SessionUser;
 			const organization = user.expand.organization;
 			
 			if (!organization) {
-				console.warn('[Session] User has no organization in expanded data');
+				// console.warn('[Session] User has no organization in expanded data');
 				clearSession();
 				return;
 			}
 			
 			// Check if user is suspended
 			if (user.status === 'suspended') {
-				console.warn('[Session] User is suspended');
+				// console.warn('[Session] User is suspended');
 				clearSession();
 				return;
 			}
@@ -153,29 +146,19 @@ export function restoreSession(): void {
 			session.permissions = user.expand?.role?.permissions || [];
 			session.isLoading = false;
 
-			console.log('[Session] Session restored from PocketBase record:', {
-				userId: user.id,
-				userName: user.name || user.email,
-				orgCode: organization.code,
-				permissions: session.permissions.length
-			});
+		
 		} else {
-			// We don't have expanded data - need to fetch it fresh
-			// But we'll do this in a non-blocking way
-			console.log('[Session] PocketBase record missing expanded data, will fetch on first API call');
-			
-			// For now, just mark as partially restored
 			session.user = record as SessionUser;
 			session.isLoading = false;
 			
 			// Fetch the full data in the background
 			fetchExpandedUserData(record.id).catch(err => {
-				console.error('[Session] Failed to fetch expanded user data:', err);
+				// console.error('[Session] Failed to fetch expanded user data:', err);
 				clearSession();
 			});
 		}
 	} catch (error) {
-		console.warn('[Session] Error during session restore:', error);
+		// console.warn('[Session] Error during session restore:', error);
 		session.isLoading = false;
 	}
 }
@@ -185,7 +168,7 @@ export function restoreSession(): void {
  */
 async function fetchExpandedUserData(userId: string): Promise<void> {
 	try {
-		console.log('[Session] Fetching expanded user data for:', userId);
+		// console.log('[Session] Fetching expanded user data for:', userId);
 		
 		const user = await pb.collection(Collections.Users).getOne<SessionUser>(
 			userId,
@@ -194,7 +177,7 @@ async function fetchExpandedUserData(userId: string): Promise<void> {
 
 		const organization = user.expand?.organization;
 		if (!organization) {
-			console.warn('[Session] User has no organization');
+		
 			clearSession();
 			return;
 		}
@@ -210,14 +193,8 @@ async function fetchExpandedUserData(userId: string): Promise<void> {
 		session.user = user;
 		session.organization = organization;
 		session.permissions = user.expand?.role?.permissions || [];
-
-		console.log('[Session] Expanded user data fetched:', {
-			userId: user.id,
-			orgCode: organization.code,
-			permissions: session.permissions.length
-		});
 	} catch (error) {
-		console.error('[Session] Failed to fetch expanded user data:', error);
+		// console.error('[Session] Failed to fetch expanded user data:', error);
 		// Don't clear session here - might just be a network error
 		// The user can still be authenticated
 	}
@@ -227,7 +204,7 @@ async function fetchExpandedUserData(userId: string): Promise<void> {
  * Clear session (logout)
  */
 export function clearSession(): void {
-	console.log('[Session] Clearing session');
+	// console.log('[Session] Clearing session');
 	
 	// Clear PocketBase auth (this also clears localStorage)
 	clearAuth();
@@ -255,9 +232,9 @@ export async function updateSessionUser(): Promise<void> {
 		session.organization = user.expand?.organization || session.organization;
 		session.permissions = user.expand?.role?.permissions || [];
 		
-		console.log('[Session] User updated');
+		// console.log('[Session] User updated');
 	} catch (error) {
-		console.error('[Session] Failed to update user:', error);
+		// console.error('[Session] Failed to update user:', error);
 	}
 }
 
@@ -274,9 +251,9 @@ export async function updateSessionOrganization(): Promise<void> {
 		
 		session.organization = organization;
 		
-		console.log('[Session] Organization updated');
+		// console.log('[Session] Organization updated');
 	} catch (error) {
-		console.error('[Session] Failed to update organization:', error);
+		// console.error('[Session] Failed to update organization:', error);
 	}
 }
 

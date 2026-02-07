@@ -27,7 +27,6 @@ export const load: PageLoad = async ({ url }) => {
 			entityType: entityFilter || undefined,
 			activityType: activityFilter || undefined
 		});
-		console.log('Loaded activities:', activities);
 
 		return {
 			activities,
@@ -37,7 +36,6 @@ export const load: PageLoad = async ({ url }) => {
 			activityTypes: Object.values(ActivitiesActivityTypeOptions)
 		};
 	} catch (error) {
-		console.error('Failed to load activities:', error);
 		return {
 			activities: [],
 			entityFilter,

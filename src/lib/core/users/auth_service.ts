@@ -97,7 +97,6 @@ export async function loginStepOne(
 				EmailLogsEmailTypeOptions.auth_otp
 			);
 		} catch (e) {
-			console.warn('[Auth] Failed to log OTP email:', e);
 		}
 
 		return {
@@ -110,19 +109,11 @@ export async function loginStepOne(
 	} catch (error: unknown) {
 		// Check if this is an MFA required response (401 with mfaId)
 		const err = error as { response?: { mfaId?: string }; status?: number };
-		console.log('[Auth] authWithPassword error:', { status: err.status, response: err.response });
 		
 		const mfaId = err.response?.mfaId;
-		console.log('[Auth] Extracted mfaId:', mfaId);
-		
 		if (mfaId) {
 			// MFA is required - request OTP for second factor
-			try {
-				console.log('[Auth] MFA required, requesting OTP for:', normalizedEmail);
-				const otpResult = await pb.collection(Collections.Users).requestOTP(normalizedEmail);
-				console.log('[Auth] OTP requested successfully, otpId:', otpResult.otpId);
-				
-				// Log the OTP email
+			try {const otpResult = await pb.collection(Collections.Users).requestOTP(normalizedEmail);
 				try {
 					await logExternalEmail(
 						normalizedEmail,
@@ -131,7 +122,7 @@ export async function loginStepOne(
 						EmailLogsEmailTypeOptions.auth_otp
 					);
 				} catch (e) {
-					console.warn('[Auth] Failed to log OTP email:', e);
+					
 				}
 
 				return {
@@ -142,7 +133,6 @@ export async function loginStepOne(
 					message: 'Verification code sent to your email'
 				};
 			} catch (otpError) {
-				console.error('[Auth] Failed to request OTP:', otpError);
 				throw new UnauthorizedError('Failed to send verification code');
 			}
 		}
@@ -171,15 +161,10 @@ export async function loginStepTwo(
 	}
 
 	try {
-		console.log('[Auth] loginStepTwo called with:', { otpId, otp: otp.substring(0, 2) + '****', mfaId });
-		
-		// Authenticate with OTP, including mfaId for MFA completion
 		const authOptions = mfaId ? { mfaId } : {};
-		console.log('[Auth] Calling authWithOTP with options:', authOptions);
 		
 		const authResult = await pb.collection(Collections.Users).authWithOTP(otpId, otp, authOptions);
-		console.log('[Auth] authWithOTP succeeded, record id:', authResult.record.id);
-
+		
 		// Fetch user with role AND organization expanded
 		const user = await pb.collection(Collections.Users).getOne<UserWithRoleAndOrg>(authResult.record.id, {
 			expand: 'role,organization'
@@ -205,7 +190,6 @@ export async function loginStepTwo(
 		try {
 			await logUserLogin(user.id, ipAddress);
 		} catch (logError) {
-			console.warn('[Auth] Failed to log user login activity:', logError);
 			// Continue with login even if activity logging fails
 		}
 
@@ -216,12 +200,10 @@ export async function loginStepTwo(
 			permissions
 		};
 	} catch (error: unknown) {
-		console.error('[Auth] loginStepTwo error:', error);
-		
 		// Log detailed PocketBase error
 		const pbError = error as { response?: { message?: string; data?: unknown }; status?: number };
 		if (pbError.response) {
-			console.error('[Auth] PocketBase error response:', pbError.response);
+			
 		}
 		
 		if (error instanceof ForbiddenError || error instanceof NotFoundError) {
@@ -351,7 +333,6 @@ export async function resendOtp(email: string): Promise<{ otpId: string }> {
 			EmailLogsEmailTypeOptions.auth_otp
 		);
 	} catch (e) {
-		console.warn('[Auth] Failed to log OTP email:', e);
 	}
 
 	return { otpId: result.otpId };

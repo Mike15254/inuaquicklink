@@ -84,7 +84,6 @@ export const load: PageLoad = async ({ params }) => {
 			interactions: emailInteractions.items
 		};
 	} catch (err) {
-		console.error('Failed to load customer details:', err);
 		throw error(404, 'Customer not found');
 	}
 };

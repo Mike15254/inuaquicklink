@@ -25,9 +25,9 @@ function authenticatePb(authToken: string | null): void {
 	if (authToken && authToken.trim()) {
 		// Save the token to authStore - this enables authenticated API calls
 		pb.authStore.save(authToken, null);
-		console.log('[authenticatePb] Auth token set, isValid:', pb.authStore.isValid);
+		// console.log('[authenticatePb] Auth token set, isValid:', pb.authStore.isValid);
 	} else {
-		console.warn('[authenticatePb] No auth token provided');
+		// console.warn('[authenticatePb] No auth token provided');
 	}
 }
 
@@ -51,7 +51,7 @@ export const actions: Actions = {
 			await approveWithAmount({ loanId, approvedAmount }, userId, permissions);
 			return { success: true, action: 'approve' };
 		} catch (error) {
-			console.error('[loans/approve] Error:', error);
+			// console.error('[loans/approve] Error:', error);
 			return fail(500, {
 				success: false,
 				action: 'approve',
@@ -79,7 +79,7 @@ export const actions: Actions = {
 			await rejectWithReason({ loanId, reason }, userId, permissions);
 			return { success: true, action: 'reject' };
 		} catch (error) {
-			console.error('[loans/reject] Error:', error);
+			// console.error('[loans/reject] Error:', error);
 			return fail(500, {
 				success: false,
 				action: 'reject',
@@ -108,7 +108,7 @@ export const actions: Actions = {
 			await disburseFunds({ loanId, transactionReference, notes }, userId, permissions);
 			return { success: true, action: 'disburse' };
 		} catch (error) {
-			console.error('[loans/disburse] Error:', error);
+			// console.error('[loans/disburse] Error:', error);
 			return fail(500, {
 				success: false,
 				action: 'disburse',
@@ -149,7 +149,7 @@ export const actions: Actions = {
 			}, userId, permissions);
 			return { success: true, action: 'recordPayment' };
 		} catch (error) {
-			console.error('[loans/recordPayment] Error:', error);
+			// console.error('[loans/recordPayment] Error:', error);
 			return fail(500, {
 				success: false,
 				action: 'recordPayment',
@@ -178,7 +178,7 @@ export const actions: Actions = {
 			await waivePenalty({ loanId, waiveAmount, reason }, userId, permissions);
 			return { success: true, action: 'waivePenalty' };
 		} catch (error) {
-			console.error('[loans/waivePenalty] Error:', error);
+			// console.error('[loans/waivePenalty] Error:', error);
 			return fail(500, {
 				success: false,
 				action: 'waivePenalty',
@@ -206,7 +206,7 @@ export const actions: Actions = {
 			await markAsDefaulted(loanId, userId, reason, permissions);
 			return { success: true, action: 'markDefaulted' };
 		} catch (error) {
-			console.error('[loans/markDefaulted] Error:', error);
+			// console.error('[loans/markDefaulted] Error:', error);
 			return fail(500, {
 				success: false,
 				action: 'markDefaulted',
@@ -257,7 +257,6 @@ export const actions: Actions = {
 				});
 			}
 		} catch (error) {
-			console.error('[loans/sendEmail] Error:', error);
 			return fail(500, {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error'

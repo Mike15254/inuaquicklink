@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import DocumentUpload from '$lib/components/DocumentUpload.svelte';
+	import DocumentUploadGuide from '$lib/components/DocumentUploadGuide.svelte';
 	import SuccessModal from '$lib/components/SuccessModal.svelte';
 	import { onMount } from 'svelte';
 	import type { ActionData, PageData } from './$types';
@@ -12,11 +13,10 @@
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import FileText from '@lucide/svelte/icons/file-text';
+	import Info from '@lucide/svelte/icons/info';
 	import Loader from '@lucide/svelte/icons/loader-circle';
 	import Shield from '@lucide/svelte/icons/shield';
 	import User from '@lucide/svelte/icons/user';
-	import Calendar from '@lucide/svelte/icons/calendar';
-	import Info from '@lucide/svelte/icons/info';
 
 	interface Props {
 		data: PageData;
@@ -33,10 +33,6 @@
 		if (!data.tokenState?.valid) {
 			goto('/');
 		}
-		// Log loan settings for debugging
-		console.log('[apply] Loan Settings from backend:', data.loanSettings);
-
-		// Load saved form data from localStorage
 		loadFormData();
 	});
 
@@ -179,9 +175,9 @@
 					dataUsageConsent = formData.dataUsageConsent || false;
 					legalDocumentConsent = formData.legalDocumentConsent || false;
 					postDatedChequeConsent = formData.postDatedChequeConsent || false;
-					console.log('[apply] Form data loaded from localStorage');
+				
 				} catch (e) {
-					console.error('[apply] Failed to load form data from localStorage:', e);
+					// console.error('[apply] Failed to load form data from localStorage:', e);
 				}
 			}
 		}
@@ -737,25 +733,15 @@
 				<form
 					method="POST"
 					use:enhance={() => {
-						console.log('[apply/form] Submitting form...');
-						console.log('[apply/form] Token:', data.tokenState?.token ? 'present' : 'missing');
-						console.log('[apply/form] Document IDs:', {
-							nationalIdFront: !!nationalIdFrontId,
-							nationalIdBack: !!nationalIdBackId,
-							passportPhoto: !!passportPhotoId,
-							latestPayslip: !!latestPayslipId,
-							previousPayslip: !!previousPayslipId,
-							postDatedCheque: !!postDatedChequeId
-						});
+					
 						isSubmitting = true;
 						hasSubmitted = true;
 						return async ({ result, update }) => {
-							console.log('[apply/form] Form result:', result);
 							isSubmitting = false;
 
 							// Handle success directly here instead of relying on $effect
 							if (result.type === 'success' && result.data?.success) {
-								console.log('[apply/form] SUCCESS! Showing modal...');
+								// console.log('[apply/form] SUCCESS! Showing modal...');
 								const data = result.data as { success: boolean; loanId?: string; message?: string };
 								successLoanId = data.loanId || '';
 								successMessage =
@@ -1399,8 +1385,12 @@
 					<div class="space-y-6" class:hidden={currentStep !== 4}>
 						<div class="rounded-lg border bg-card p-6">
 							<h2 class="mb-4 text-lg font-semibold text-foreground">Required Documents</h2>
+							
 
-							<div class="space-y-6">
+							<!-- Upload Guide -->
+							<DocumentUploadGuide />
+
+							<div class="grid gap-6 md:grid-cols-2">
 								<!-- National ID Front -->
 								<div>
 									<label for="ID" class="mb-1.5 block text-sm font-medium text-foreground">
@@ -1416,7 +1406,6 @@
 										required={true}
 										uploadedDocumentId={nationalIdFrontId}
 										{hasSubmitted}
-										maxSize={3}
 										on:fileUploaded={handleFileUploaded}
 										on:fileRemoved={handleFileRemoved}
 									/>
@@ -1440,7 +1429,6 @@
 										required={true}
 										uploadedDocumentId={nationalIdBackId}
 										{hasSubmitted}
-										maxSize={3}
 										on:fileUploaded={handleFileUploaded}
 										on:fileRemoved={handleFileRemoved}
 									/>
@@ -1464,7 +1452,6 @@
 										required={true}
 										uploadedDocumentId={passportPhotoId}
 										{hasSubmitted}
-										maxSize={3}
 										on:fileUploaded={handleFileUploaded}
 										on:fileRemoved={handleFileRemoved}
 									/>
@@ -1488,7 +1475,6 @@
 										required={true}
 										uploadedDocumentId={latestPayslipId}
 										{hasSubmitted}
-										maxSize={3}
 										on:fileUploaded={handleFileUploaded}
 										on:fileRemoved={handleFileRemoved}
 									/>
@@ -1512,7 +1498,6 @@
 										required={true}
 										uploadedDocumentId={previousPayslipId}
 										{hasSubmitted}
-										maxSize={3}
 										on:fileUploaded={handleFileUploaded}
 										on:fileRemoved={handleFileRemoved}
 									/>
@@ -1536,7 +1521,6 @@
 										required={true}
 										uploadedDocumentId={postDatedChequeId}
 										{hasSubmitted}
-										maxSize={3}
 										on:fileUploaded={handleFileUploaded}
 										on:fileRemoved={handleFileRemoved}
 									/>

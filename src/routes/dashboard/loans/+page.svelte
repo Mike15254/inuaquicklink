@@ -119,7 +119,6 @@
 			loans = [...loans, ...result.items];
 			currentPage = nextPage;
 		} catch (error) {
-			console.error('Failed to load more loans:', error);
 			toast.error('Failed to load more loans');
 		} finally {
 			isLoadingMore = false;
@@ -148,7 +147,6 @@
 			generatedLink = `${baseUrl}/apply?token=${link.token}`;
 			toast.success('Application link generated');
 		} catch (error) {
-			console.error('[Loans] Failed to generate link:', error);
 
 			// Extract the most useful error message
 			let errorMessage = 'Failed to generate link';

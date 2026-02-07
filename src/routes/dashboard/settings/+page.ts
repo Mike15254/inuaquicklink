@@ -18,7 +18,6 @@ export const load: PageLoad = async () => {
 		const loanSettings = await getLoanSettings();
 		return { loanSettings };
 	} catch (error) {
-		console.error('Failed to load settings:', error);
 		return { loanSettings: null };
 	}
 };

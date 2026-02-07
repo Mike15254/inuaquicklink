@@ -62,7 +62,6 @@ export async function sendEmail(request: SendEmailRequest): Promise<SendEmailRes
 		let sendError: string | undefined;
 
 		if (isSmtpConfigured()) {
-			console.log('[sendEmail] SMTP configured, sending email...');
 			const sendResult = await sendMail({
 				to: request.to,
 				subject: request.subject,
@@ -73,12 +72,12 @@ export async function sendEmail(request: SendEmailRequest): Promise<SendEmailRes
 			sendError = sendResult.error;
 			
 			if (sendResult.success) {
-				console.log('[sendEmail] Email sent successfully via SMTP');
+				// console.log('[sendEmail] Email sent successfully via SMTP');
 			} else {
-				console.warn('[sendEmail] SMTP send failed:', sendResult.error);
+				// console.warn('[sendEmail] SMTP send failed:', sendResult.error);
 			}
 		} else {
-			console.warn('[sendEmail] SMTP not configured, email will only be logged');
+			
 		}
 
 		// Log the email to database
@@ -95,7 +94,7 @@ export async function sendEmail(request: SendEmailRequest): Promise<SendEmailRes
 				request.isAutomated || false
 			);
 		} catch (activityError) {
-			console.warn('[sendEmail] Failed to log activity:', activityError);
+			// console.warn('[sendEmail] Failed to log activity:', activityError);
 		}
 
 		return {
@@ -105,7 +104,7 @@ export async function sendEmail(request: SendEmailRequest): Promise<SendEmailRes
 	} catch (error) {
 		// Log failed email
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-		console.error('[sendEmail] Error:', errorMessage);
+		// console.error('[sendEmail] Error:', errorMessage);
 		
 		try {
 			await logEmailToDb(request, EmailLogsStatusOptions.failed, errorMessage);

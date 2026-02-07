@@ -37,7 +37,6 @@ export const load: PageLoad = async ({ url }) => {
 			isLoading: false
 		};
 	} catch (error) {
-		console.error('Failed to load analytics:', error);
 		return {
 			analytics: null,
 			period: periodParam,

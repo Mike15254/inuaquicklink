@@ -114,7 +114,6 @@
 			// Refresh page data
 			goto(`/${businessCode}/customers/${customer.id}`, { invalidateAll: true });
 		} catch (error) {
-			console.error('Failed to update customer:', error);
 			toast.error('Failed to update customer');
 		} finally {
 			isSaving = false;
@@ -132,7 +131,6 @@
 			showBlockDialog = false;
 			goto(`/${businessCode}/customers/${customer.id}`, { invalidateAll: true });
 		} catch (error) {
-			console.error('Failed to block customer:', error);
 			toast.error('Failed to block customer');
 		} finally {
 			isBlocking = false;
@@ -149,7 +147,6 @@
 			toast.success('Customer activated');
 			goto(`/${businessCode}/customers/${customer.id}`, { invalidateAll: true });
 		} catch (error) {
-			console.error('Failed to activate customer:', error);
 			toast.error('Failed to activate customer');
 		} finally {
 			isBlocking = false;
@@ -625,13 +622,13 @@
 															doc.document_type as LoanDocumentsDocumentTypeOptions
 														] || doc.document_type}
 													</p>
-													<p class="mt-1 text-xs text-muted-foreground">
-														{doc.file_name || 'Document'}
-													</p>
+													<div>
+														
+													</div>
 													<!-- We ned to fetch the docuemnt as image also for display -->
 
 													<img
-														class="h-24 w-24 rounded-full object-cover"
+														class="h-36 w-48 rounded-xl object-cover"
 														src={getDocumentUrl(doc)}
 													/>
 												</div>

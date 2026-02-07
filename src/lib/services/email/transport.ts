@@ -35,7 +35,6 @@ export function configureSmtp(config: Partial<SmtpConfig>) {
 	smtpConfig = { ...smtpConfig, ...config };
 	// Reset transporter to ensure new config is used
 	transporter = null;
-	console.log('[email/transport] SMTP configuration updated');
 }
 
 // Check if SMTP is configured
@@ -48,7 +47,6 @@ let transporter: Transporter | null = null;
 
 function getTransporter(): Transporter | null {
 	if (!isSmtpConfigured()) {
-		console.warn('[email/transport] SMTP not configured. Set SMTP_USER and SMTP_PASS environment variables.');
 		return null;
 	}
 
@@ -95,7 +93,6 @@ export async function sendMail(options: SendMailOptions): Promise<SendMailResult
 	const transport = getTransporter();
 
 	if (!transport) {
-		console.log('[email/transport] SMTP not configured, email not sent:', options.subject);
 		return {
 			success: false,
 			error: 'SMTP not configured'
@@ -103,21 +100,9 @@ export async function sendMail(options: SendMailOptions): Promise<SendMailResult
 	}
 
 	try {
-		// Log actual configuration being used (masked)
-		console.log('[email/transport] Using SMTP Config:', {
-			host: smtpConfig.host,
-			port: smtpConfig.port,
-			secure: smtpConfig.secure,
-			user: smtpConfig.user ? '***' : '(missing)',
-			from: smtpConfig.from
-		});
-
 		const fromEmail = smtpConfig.from || smtpConfig.user;
-		const fromName = smtpConfig.fromName || 'inuaquicklink Loans';
+		const fromName = smtpConfig.fromName;
 		const fromAddress = options.from || `"${fromName}" <${fromEmail}>`;
-
-		console.log('[email/transport] Sending email to:', options.to);
-		console.log('[email/transport] Subject:', options.subject);
 
 		const info = await transport.sendMail({
 			from: fromAddress,
@@ -125,14 +110,12 @@ export async function sendMail(options: SendMailOptions): Promise<SendMailResult
 			subject: options.subject,
 			html: options.html,
 			replyTo: options.replyTo,
-			attachments: options.attachments?.map(att => ({
+			attachments: options.attachments?.map((att) => ({
 				filename: att.filename,
 				content: att.content,
 				contentType: att.contentType
 			}))
 		});
-
-		console.log('[email/transport] Email sent successfully:', info.messageId);
 
 		return {
 			success: true,
@@ -140,8 +123,6 @@ export async function sendMail(options: SendMailOptions): Promise<SendMailResult
 		};
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-		console.error('[email/transport] Failed to send email:', errorMessage);
-
 		return {
 			success: false,
 			error: errorMessage
@@ -161,10 +142,8 @@ export async function verifySmtpConnection(): Promise<boolean> {
 
 	try {
 		await transport.verify();
-		console.log('[email/transport] SMTP connection verified');
 		return true;
 	} catch (error) {
-		console.error('[email/transport] SMTP connection failed:', error);
 		return false;
 	}
 }

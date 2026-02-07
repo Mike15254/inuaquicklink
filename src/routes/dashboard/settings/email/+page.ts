@@ -28,7 +28,6 @@ export const load: PageLoad = async () => {
 			organization: orgs.items[0] || null 
 		};
 	} catch (error) {
-		console.error('Failed to load email settings:', error);
 		return { emailTemplates: [], organization: null };
 	}
 };

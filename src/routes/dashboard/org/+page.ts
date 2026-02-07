@@ -34,7 +34,6 @@ export const load: PageLoad = async ({ url }) => {
 			roles
 		};
 	} catch (error) {
-		console.error('Failed to load organization data:', error);
 		return {
 			tab,
 			users: [],

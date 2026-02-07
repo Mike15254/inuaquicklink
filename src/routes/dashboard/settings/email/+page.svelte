@@ -180,7 +180,6 @@
 			toast.success('Email template updated successfully');
 			isEditingTemplate = false;
 		} catch (error) {
-			console.error(error);
 			toast.error('Failed to update email template');
 		} finally {
 			isSavingTemplate = false;

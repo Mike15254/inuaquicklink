@@ -88,7 +88,6 @@
 			const permissions = session.permissions || [];
 			customerSearchResults = await searchCustomers(customerSearchQuery, permissions, 10);
 		} catch (error) {
-			console.error('Search failed:', error);
 			customerSearchResults = [];
 		} finally {
 			isSearching = false;
@@ -203,7 +202,6 @@
 			scheduleTime = '';
 			scheduleNotes = '';
 		} catch (error) {
-			console.error('Failed to schedule:', error);
 			toast.error('Failed to schedule interaction');
 		} finally {
 			isScheduling = false;

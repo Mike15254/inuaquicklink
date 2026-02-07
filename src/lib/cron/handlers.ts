@@ -150,7 +150,7 @@ export async function runPaymentReminderJob(): Promise<CronJobResult> {
 							amount_due: formatKES(loan.balance || 0),
 							balance_remaining: formatKES(loan.balance || 0),
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name
 						},
 						{
 							customerId: customer?.id,
@@ -255,7 +255,7 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 							amount_due: formatKES(loan.balance || 0),
 							balance_remaining: formatKES(loan.balance || 0),
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name
 						},
 						{
 							customerId: customer?.id,
@@ -355,7 +355,7 @@ export async function runPenaltyCalculationJob(): Promise<CronJobResult> {
 								interest_amount: formatKES(loan.interest_amount || 0),
 								processing_fee: formatKES(loan.processing_fee || 0),
 								payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-								COMPANY_NAME: organization?.name || 'inuaquicklink'
+								COMPANY_NAME: organization?.name
 							},
 							{
 								customerId: customer?.id,
@@ -459,7 +459,7 @@ export async function runDefaultCheckJob(): Promise<CronJobResult> {
 							default_date: formatDate(new Date().toISOString()),
 							days_overdue: daysOverdue,
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name
 						},
 						{
 							customerId: customer?.id,

@@ -30,13 +30,6 @@ export const actions: Actions = {
 		try {
 			const result = await loginStepOne(email, password);
 
-			console.log('[Auth Page] loginStepOne success. Returning to client:', {
-				step: 'otp',
-				otpId: result.otpId,
-				mfaId: result.mfaId,
-				userId: result.userId
-			});
-
 			return {
 				success: true,
 				step: 'otp',

@@ -20,7 +20,7 @@ export async function compileEmailTemplate(
 ): Promise<{ subject: string; body: string } | null> {
     const template = await getEmailTemplate(templateKey);
     if (!template) {
-        console.warn(`[compileEmailTemplate] Template not found: ${templateKey}`);
+        // console.warn(`[compileEmailTemplate] Template not found: ${templateKey}`);
         return null;
     }
 

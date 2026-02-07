@@ -119,24 +119,18 @@ export async function findExistingCustomerByMatch(
 	if (byId) {
 		// If national ID matches and phone matches, it's the same customer
 		if (byId.phone === normalizedPhone) {
-			console.log('[findExistingCustomerByMatch] Match found: ID + Phone');
 			return byId;
 		}
 		// If national ID matches and email matches, it's the same customer
 		if (byId.email === normalizedEmail) {
-			console.log('[findExistingCustomerByMatch] Match found: ID + Email');
 			return byId;
 		}
 	}
 	
 	// Check if email and phone both match the same customer
 	if (byEmail && byPhone && byEmail.id === byPhone.id) {
-		console.log('[findExistingCustomerByMatch] Match found: Email + Phone');
 		return byEmail;
 	}
-	
-	// No 2-field match found
-	console.log('[findExistingCustomerByMatch] No 2-field match found');
 	return null;
 }
 
@@ -169,7 +163,6 @@ export async function getCustomerById(customerId: string): Promise<CustomersResp
 			.getOne<CustomersResponse>(customerId);
 		return customer;
 	} catch (error) {
-		console.error(`[getCustomerById] Failed to fetch customer ${customerId}:`, error);
 		throw new NotFoundError('Customer', customerId);
 	}
 }
@@ -426,7 +419,6 @@ export async function getCustomers(
 			filter,
 			sort: '-created'
 		});
-		console.log('getCustomers result:', result);
 	return {
 		items: result.items,
 		totalItems: result.totalItems,
@@ -454,7 +446,6 @@ export async function searchCustomers(
 			filter: `name ~ "${search}" || email ~ "${search}" || phone ~ "${search}" || national_id ~ "${search}"`,
 			sort: 'name'
 		});
-	console.log('searchCustomers result:', result);
 	return result.items;
 }
 

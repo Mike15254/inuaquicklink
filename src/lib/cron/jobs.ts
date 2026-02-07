@@ -3,7 +3,7 @@
  * These define the jobs that will be registered in PocketBase hooks
  */
 
-import { CronJobsJobTypeOptions, CronJobsStatusOptions } from '$lib/types';
+import { CronJobsJobTypeOptions } from '$lib/types';
 
 /**
  * Cron job configuration
@@ -69,8 +69,8 @@ export const CRON_JOBS: CronJobConfig[] = [
 		name: 'Link Expiry Check',
 		jobType: CronJobsJobTypeOptions.link_expiry_check,
 		schedule: '*/10 * * * *', // Every 10 minutes
-		description: 'Mark expired application links',
-		enabled: true
+		description: 'Mark expired application links (Disabled - handled by backend)',
+		enabled: false
 	},
 	{
 		id: 'system_cleanup',
