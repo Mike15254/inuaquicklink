@@ -3,42 +3,41 @@
  * Handles loan lifecycle operations with email notifications and activity logging
  */
 
-import { pb } from '$lib/infra/db/pb';
-import {
-	Collections,
-	LoansStatusOptions,
-	type LoansResponse,
-	type CustomersResponse,
-	type OrganizationResponse,
-	type LoanSettingsResponse
-} from '$lib/types';
-import { NotFoundError, ValidationError, ForbiddenError } from '$lib/shared/errors';
-import { nowISO, calculateDaysOverdue, addDays, formatDate, todayISO } from '$lib/shared/date_time';
-import { formatKES } from '$lib/shared/currency';
 import { logActivity } from '$lib/core/activity/activity_service';
 import {
+	getCustomerById,
 	incrementCustomerLoans,
-	markCustomerLoanRepaid,
-	getCustomerById
+	markCustomerLoanRepaid
 } from '$lib/core/customers/customer_service';
-import { ActivitiesActivityTypeOptions, ActivitiesEntityTypeOptions } from '$lib/types';
-import { assertPermission, type UserPermissions } from '$lib/services/roles/permission_checker';
-import { Permission } from '$lib/services/roles/permissions';
+import { pb } from '$lib/infra/db/pb';
 import { sendEmailWithAttachments } from '$lib/services/email/client';
 import {
+	compileEmailTemplate,
 	sendTemplateEmail,
 	TEMPLATE_KEYS,
-	compileEmailTemplate,
 } from '$lib/services/email/email_template_service';
+import { notifyLoanClosed, notifyLoanDisbursed, notifyPaymentRecorded } from '$lib/services/email/notification_service';
+import { assertPermission, type UserPermissions } from '$lib/services/roles/permission_checker';
+import { Permission } from '$lib/services/roles/permissions';
+import { formatKES } from '$lib/shared/currency';
+import { formatDate, nowISO, todayISO } from '$lib/shared/date_time';
+import { ForbiddenError, NotFoundError, ValidationError } from '$lib/shared/errors';
+import { generateLoanApplicationPDF, type CompanyInfo, type LoanApplicationData } from '$lib/shared/pdfGenerator';
+import {
+	ActivitiesActivityTypeOptions, ActivitiesEntityTypeOptions,
+	Collections,
+	LoansStatusOptions,
+	type CustomersResponse,
+	type LoanSettingsResponse,
+	type LoansResponse,
+	type OrganizationResponse
+} from '$lib/types';
 import {
 	calculateLoan,
-	calculatePenalty,
-	calculateBalanceDue,
-	type LoanCalculationSettings,
-	DEFAULT_LOAN_SETTINGS
+	DEFAULT_LOAN_SETTINGS,
+	type LoanCalculationSettings
 } from './loan_calculations';
 import { getLoanById, type LoanWithRelations } from './loan_service';
-import { generateLoanApplicationPDF, type LoanApplicationData, type CompanyInfo } from '$lib/shared/pdfGenerator';
 
 // Email templates (will be loaded dynamically in production)
 const EMAIL_TEMPLATES: Record<string, string> = {};
@@ -381,6 +380,16 @@ export async function disburseFunds(
 		// console.warn(`[disburseFunds] Failed to send disbursement email for loan ${loan.id}:`, error);
 	}
 
+	// Notify admin users about disbursement
+	try {
+		await notifyLoanDisbursed({
+			customerName: customer.name,
+			loanNumber: loan.loan_number,
+			disbursementAmount: loan.disbursement_amount,
+			dueDate: loan.due_date
+		});
+	} catch { /* don't block on notification failure */ }
+
 	return updatedLoan;
 }
 
@@ -615,6 +624,17 @@ export async function closeLoanAsWriteOff(
 		// console.warn('Failed to send loan closure email:', error);
 	}
 
+	// Notify admin users about loan closure
+	try {
+		const closedCustomer = await getCustomerFromLoan(loan, 'closeLoanAsWriteOff-notify');
+		await notifyLoanClosed({
+			customerName: closedCustomer.name,
+			loanNumber: loan.loan_number,
+			reason: input.reason,
+			outstandingBalance: loan.balance || 0
+		});
+	} catch { /* don't block on notification failure */ }
+
 	return updatedLoan;
 }
 
@@ -724,6 +744,17 @@ export async function recordPaymentWithEmail(
 			isFullPayment: newBalance <= 0
 		});
 	}
+
+	// Notify admin users about payment
+	try {
+		await notifyPaymentRecorded({
+			customerName: customer.name,
+			loanNumber: loan.loan_number,
+			amountPaid: input.amount,
+			newBalance,
+			isFullPayment: newBalance <= 0
+		});
+	} catch { /* don't block on notification failure */ }
 
 	return updatedLoan;
 }

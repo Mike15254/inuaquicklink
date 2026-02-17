@@ -17,7 +17,8 @@ export const PermissionCategory = {
 	SETTINGS: 'settings',
 	ORGANIZATION: 'organization',
 	CRM: 'crm',
-	ACTIVITIES: 'activities'
+	ACTIVITIES: 'activities',
+	SYSTEM: 'system'
 } as const;
 
 export type PermissionCategoryType = (typeof PermissionCategory)[keyof typeof PermissionCategory];
@@ -106,7 +107,10 @@ export const Permission = {
 
 	// Activity log permissions
 	ACTIVITIES_VIEW: 'activities.view',
-	ACTIVITIES_EXPORT: 'activities.export'
+	ACTIVITIES_EXPORT: 'activities.export',
+
+	// System permissions
+	SYSTEM_EMAILS: 'system.emails'
 } as const;
 
 export type PermissionType = (typeof Permission)[keyof typeof Permission];
@@ -397,6 +401,14 @@ export const PERMISSION_DEFINITIONS: PermissionMeta[] = [
 		label: 'Export Activities',
 		description: 'Export activity logs',
 		category: PermissionCategory.ACTIVITIES
+	},
+
+	// System
+	{
+		key: Permission.SYSTEM_EMAILS,
+		label: 'Email Notifications',
+		description: 'Receive system email notifications for loan events',
+		category: PermissionCategory.SYSTEM
 	}
 ];
 
@@ -458,7 +470,8 @@ export const DEFAULT_ROLE_PERMISSIONS = {
 		Permission.CRM_VIEW,
 		Permission.CRM_CREATE,
 		Permission.CRM_UPDATE,
-		Permission.ACTIVITIES_VIEW
+		Permission.ACTIVITIES_VIEW,
+		Permission.SYSTEM_EMAILS
 	],
 	officer: [
 		Permission.CUSTOMERS_VIEW,

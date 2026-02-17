@@ -28,6 +28,7 @@ import {
 	DEFAULT_LOAN_SETTINGS,
 	type LoanCalculationSettings
 } from '$lib/core/loans/loan_calculations';
+import { notifyDueAndOverdueLoans } from '$lib/services/email/notification_service';
 
 /**
  * Type for loans with customer expansion
@@ -103,6 +104,7 @@ export async function runPaymentReminderJob(): Promise<CronJobResult> {
 	const startTime = Date.now();
 	const errors: string[] = [];
 	let processedCount = 0;
+	let dueTodayCount = 0;
 
 	try {
 		const today = new Date();
@@ -129,6 +131,9 @@ export async function runPaymentReminderJob(): Promise<CronJobResult> {
 				const dueDate = new Date(loan.due_date);
 				const daysDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
+				// Track loans due today for admin notification
+				if (daysDiff === 0) dueTodayCount++;
+
 				// Send reminder based on days until due
 				let reminderType: string | null = null;
 				if (daysDiff === 3) reminderType = 'payment_reminder_3_days';
@@ -150,7 +155,7 @@ export async function runPaymentReminderJob(): Promise<CronJobResult> {
 							amount_due: formatKES(loan.balance || 0),
 							balance_remaining: formatKES(loan.balance || 0),
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name
+							COMPANY_NAME: organization?.name || 'inuaquicklink'
 						},
 						{
 							customerId: customer?.id,
@@ -178,6 +183,17 @@ export async function runPaymentReminderJob(): Promise<CronJobResult> {
 				`Payment reminder job completed: ${processedCount} reminders queued`,
 				ActivitiesEntityTypeOptions.system
 			);
+		}
+
+		// Notify admins about loans due today
+		if (dueTodayCount > 0) {
+			try {
+				await notifyDueAndOverdueLoans({
+					dueTodayCount,
+					overdueCount: 0,
+					totalOverdueAmount: 0
+				});
+			} catch { /* don't block cron job */ }
 		}
 	} catch (error) {
 		errors.push(`Job failed: ${error}`);
@@ -255,7 +271,7 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 							amount_due: formatKES(loan.balance || 0),
 							balance_remaining: formatKES(loan.balance || 0),
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name
+							COMPANY_NAME: organization?.name || 'inuaquicklink'
 						},
 						{
 							customerId: customer?.id,
@@ -284,6 +300,21 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 				`Overdue check completed: ${processedCount} loans processed`,
 				ActivitiesEntityTypeOptions.system
 			);
+		}
+
+		// Notify admins about overdue loans
+		if (overdueLoans.length > 0) {
+			try {
+				const totalOverdueAmount = overdueLoans.reduce(
+					(sum, loan) => sum + (loan.balance || 0),
+					0
+				);
+				await notifyDueAndOverdueLoans({
+					dueTodayCount: 0,
+					overdueCount: overdueLoans.length,
+					totalOverdueAmount
+				});
+			} catch { /* don't block cron job */ }
 		}
 	} catch (error) {
 		errors.push(`Job failed: ${error}`);
@@ -355,7 +386,7 @@ export async function runPenaltyCalculationJob(): Promise<CronJobResult> {
 								interest_amount: formatKES(loan.interest_amount || 0),
 								processing_fee: formatKES(loan.processing_fee || 0),
 								payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-								COMPANY_NAME: organization?.name
+								COMPANY_NAME: organization?.name || 'inuaquicklink'
 							},
 							{
 								customerId: customer?.id,
@@ -459,7 +490,7 @@ export async function runDefaultCheckJob(): Promise<CronJobResult> {
 							default_date: formatDate(new Date().toISOString()),
 							days_overdue: daysOverdue,
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name
+							COMPANY_NAME: organization?.name || 'inuaquicklink'
 						},
 						{
 							customerId: customer?.id,
