@@ -12,6 +12,7 @@ import {
 import { createLoan, type CreateLoanInput } from '$lib/core/loans/loan_service';
 import { pb } from '$lib/infra/db/pb';
 import { sendApplicationReceivedEmail } from '$lib/services/email/client';
+import { notifyNewLoanApplication } from '$lib/services/email/notification_service';
 import { normalizeEmail, normalizeKraPin, normalizePhone } from '$lib/shared/rules';
 import {
 	Collections,
@@ -461,6 +462,17 @@ export const actions: Actions = {
 				}
 			} catch (emailError) {
 			}
+
+			// Notify admin users about new application
+			try {
+				await notifyNewLoanApplication({
+					customerName: fullName,
+					loanNumber: loan.loan_number,
+					loanAmount: loan.loan_amount,
+					interestAmount: loan.interest_amount,
+					dueDate: loan.due_date
+				});
+			} catch { /* don't block on notification failure */ }
 
 			return {
 				success: true,

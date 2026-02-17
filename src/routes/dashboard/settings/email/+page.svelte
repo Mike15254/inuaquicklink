@@ -74,7 +74,7 @@
 			{ name: 'loan_amount', description: 'Requested loan amount', example: 'KES 50,000' },
 			{ name: 'loan_period_days', description: 'Loan period in days', example: '14' },
 			{ name: 'application_date', description: 'Date of application', example: '13/01/2026' },
-			{ name: 'organization_name', description: 'Your company name', example: 'Richden Capital' },
+			{ name: 'organization_name', description: 'Your company name', example: 'Inua Quick Link' },
 			{ name: 'organization_phone', description: 'Company phone', example: '+254 700 000 000' },
 			{ name: 'organization_email', description: 'Company email', example: 'info@company.co.ke' }
 		],
