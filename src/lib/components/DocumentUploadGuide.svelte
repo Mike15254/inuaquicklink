@@ -16,19 +16,19 @@
 				<ul class="space-y-1.5 sm:space-y-2 text-muted-foreground">
 					<li class="flex items-start gap-1.5 sm:gap-2">
 						<Camera class="mt-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
-						<span class="wrap-break-word"><strong class="font-semibold">Mobile:</strong> Take photos with camera</span>
+						<span class="break-words"><strong class="font-semibold">Mobile:</strong> Take photos with camera</span>
 					</li>
 					<li class="flex items-start gap-1.5 sm:gap-2">
 						<FileText class="mt-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
-						<span class="wrap-break-word"><strong class="font-semibold">Size:</strong> Up to 10MB per file</span>
+						<span class="break-words"><strong class="font-semibold">Size:</strong> Up to 10MB per file</span>
 					</li>
 					<li class="flex items-start gap-1.5 sm:gap-2">
 						<CheckCircle class="mt-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
-						<span class="wrap-break-word"><strong class="font-semibold">Format:</strong> JPEG, PNG, WebP, PDF</span>
+						<span class="break-words"><strong class="font-semibold">Format:</strong> JPEG, PNG, WebP, PDF</span>
 					</li>
 					<li class="flex items-start gap-1.5 sm:gap-2">
 						<CheckCircle class="mt-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
-						<span class="wrap-break-word"><strong class="font-semibold">Tip:</strong> Clear & readable images</span>
+						<span class="break-words"><strong class="font-semibold">Tip:</strong> Clear & readable images</span>
 					</li>
 				</ul>
 			</div>

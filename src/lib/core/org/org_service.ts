@@ -20,6 +20,7 @@ export interface UpdateOrganizationInput {
 	bank_account?: string;
 	account_number?: string;
 	mpesa_paybill?: string;
+	notification_email?: string;
 	logo?: File | null;
 }
 
@@ -119,7 +120,8 @@ export async function getDefaultOrganization(): Promise<OrganizationResponse | n
 export async function updateOrganization(
 	orgId: string,
 	input: UpdateOrganizationInput,
-	actorPermissions: UserPermissions
+	actorPermissions: UserPermissions,
+	actorId: string
 ): Promise<OrganizationResponse> {
 	assertPermission(actorPermissions, Permission.ORGANIZATION_UPDATE);
 
@@ -136,6 +138,7 @@ export async function updateOrganization(
 	if (input.bank_account !== undefined) updateData.bank_account = input.bank_account.trim();
 	if (input.account_number !== undefined) updateData.account_number = input.account_number.trim();
 	if (input.mpesa_paybill !== undefined) updateData.mpesa_paybill = input.mpesa_paybill.trim();
+	if (input.notification_email !== undefined) updateData.notification_email = input.notification_email.trim();
 	if (input.logo !== undefined) updateData.logo = input.logo;
 
 	const organization = await pb.collection(Collections.Organization).update<OrganizationResponse>(orgId, updateData);
@@ -144,7 +147,7 @@ export async function updateOrganization(
 	clearOrgCache();
 
 	// Log activity
-	await logSettingsUpdated(orgId, 'organization', 'organization');
+	await logSettingsUpdated(actorId, 'organization', 'organization');
 
 	return organization;
 }

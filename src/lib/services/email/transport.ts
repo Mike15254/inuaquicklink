@@ -58,6 +58,10 @@ function getTransporter(): Transporter | null {
 			auth: {
 				user: smtpConfig.user,
 				pass: smtpConfig.pass
+			},
+			tls: {
+				// Allow self-signed / mismatched certificates common on shared hosting
+				rejectUnauthorized: false
 			}
 		});
 	}
@@ -101,7 +105,7 @@ export async function sendMail(options: SendMailOptions): Promise<SendMailResult
 
 	try {
 		const fromEmail = smtpConfig.from || smtpConfig.user;
-		const fromName = smtpConfig.fromName;
+		const fromName = smtpConfig.fromName || 'inuaquicklink';
 		const fromAddress = options.from || `"${fromName}" <${fromEmail}>`;
 
 		const info = await transport.sendMail({
@@ -123,6 +127,7 @@ export async function sendMail(options: SendMailOptions): Promise<SendMailResult
 		};
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+		console.error('[sendMail] SMTP error:', errorMessage);
 		return {
 			success: false,
 			error: errorMessage

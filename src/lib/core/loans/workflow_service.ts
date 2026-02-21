@@ -3,41 +3,43 @@
  * Handles loan lifecycle operations with email notifications and activity logging
  */
 
-import { logActivity } from '$lib/core/activity/activity_service';
-import {
-	getCustomerById,
-	incrementCustomerLoans,
-	markCustomerLoanRepaid
-} from '$lib/core/customers/customer_service';
 import { pb } from '$lib/infra/db/pb';
-import { sendEmailWithAttachments } from '$lib/services/email/client';
 import {
-	compileEmailTemplate,
-	sendTemplateEmail,
-	TEMPLATE_KEYS,
-} from '$lib/services/email/email_template_service';
-import { notifyLoanClosed, notifyLoanDisbursed, notifyPaymentRecorded } from '$lib/services/email/notification_service';
-import { assertPermission, type UserPermissions } from '$lib/services/roles/permission_checker';
-import { Permission } from '$lib/services/roles/permissions';
-import { formatKES } from '$lib/shared/currency';
-import { formatDate, nowISO, todayISO } from '$lib/shared/date_time';
-import { ForbiddenError, NotFoundError, ValidationError } from '$lib/shared/errors';
-import { generateLoanApplicationPDF, type CompanyInfo, type LoanApplicationData } from '$lib/shared/pdfGenerator';
-import {
-	ActivitiesActivityTypeOptions, ActivitiesEntityTypeOptions,
 	Collections,
 	LoansStatusOptions,
-	type CustomersResponse,
-	type LoanSettingsResponse,
 	type LoansResponse,
-	type OrganizationResponse
+	type CustomersResponse,
+	type OrganizationResponse,
+	type LoanSettingsResponse
 } from '$lib/types';
+import { NotFoundError, ValidationError, ForbiddenError } from '$lib/shared/errors';
+import { nowISO, calculateDaysOverdue, addDays, formatDate, todayISO } from '$lib/shared/date_time';
+import { formatKES } from '$lib/shared/currency';
+import { logActivity } from '$lib/core/activity/activity_service';
+import {
+	incrementCustomerLoans,
+	markCustomerLoanRepaid,
+	getCustomerById
+} from '$lib/core/customers/customer_service';
+import { ActivitiesActivityTypeOptions, ActivitiesEntityTypeOptions } from '$lib/types';
+import { assertPermission, type UserPermissions } from '$lib/services/roles/permission_checker';
+import { Permission } from '$lib/services/roles/permissions';
+import { sendEmailWithAttachments } from '$lib/services/email/client';
+import {
+	sendTemplateEmail,
+	TEMPLATE_KEYS,
+	compileEmailTemplate,
+} from '$lib/services/email/email_template_service';
 import {
 	calculateLoan,
-	DEFAULT_LOAN_SETTINGS,
-	type LoanCalculationSettings
+	calculatePenalty,
+	calculateBalanceDue,
+	type LoanCalculationSettings,
+	DEFAULT_LOAN_SETTINGS
 } from './loan_calculations';
 import { getLoanById, type LoanWithRelations } from './loan_service';
+import { generateLoanApplicationPDF, type LoanApplicationData, type CompanyInfo } from '$lib/shared/pdfGenerator';
+import { notifyLoanDisbursed, notifyPaymentRecorded, notifyLoanClosed } from '$lib/services/email/notification_service';
 
 // Email templates (will be loaded dynamically in production)
 const EMAIL_TEMPLATES: Record<string, string> = {};

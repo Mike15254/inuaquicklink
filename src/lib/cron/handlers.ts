@@ -19,6 +19,9 @@ import { formatKES } from '$lib/shared/currency';
 import { sendTemplateEmail, TEMPLATE_KEYS } from '$lib/services/email/email_template_service';
 import { logSystemAction } from '$lib/core/activity/activity_service';
 import type { CronJobResult } from './jobs';
+import { notifyDueAndOverdueLoans } from '$lib/services/email/notification_service';
+import { sendMail } from '$lib/services/email/transport';
+import { EmailLogsStatusOptions, type EmailLogsResponse } from '$lib/types';
 import {
 	calculatePenalty,
 	isInGracePeriod,
@@ -28,7 +31,6 @@ import {
 	DEFAULT_LOAN_SETTINGS,
 	type LoanCalculationSettings
 } from '$lib/core/loans/loan_calculations';
-import { notifyDueAndOverdueLoans } from '$lib/services/email/notification_service';
 
 /**
  * Type for loans with customer expansion
@@ -178,12 +180,10 @@ export async function runPaymentReminderJob(): Promise<CronJobResult> {
 			}
 		}
 
-		if (processedCount > 0) {
-			await logSystemAction(
-				`Payment reminder job completed: ${processedCount} reminders queued`,
-				ActivitiesEntityTypeOptions.system
-			);
-		}
+		await logSystemAction(
+			`Payment reminder job: ${processedCount} reminder${processedCount !== 1 ? 's' : ''} queued`,
+			ActivitiesEntityTypeOptions.system
+		);
 
 		// Notify admins about loans due today
 		if (dueTodayCount > 0) {
@@ -295,12 +295,10 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 			}
 		}
 
-		if (processedCount > 0) {
-			await logSystemAction(
-				`Overdue check completed: ${processedCount} loans processed`,
-				ActivitiesEntityTypeOptions.system
-			);
-		}
+		await logSystemAction(
+			`Overdue check: ${processedCount} loan${processedCount !== 1 ? 's' : ''} processed`,
+			ActivitiesEntityTypeOptions.system
+		);
 
 		// Notify admins about overdue loans
 		if (overdueLoans.length > 0) {
@@ -421,12 +419,10 @@ export async function runPenaltyCalculationJob(): Promise<CronJobResult> {
 			}
 		}
 
-		if (processedCount > 0) {
-			await logSystemAction(
-				`Penalty calculation completed: ${processedCount} penalties applied`,
-				ActivitiesEntityTypeOptions.system
-			);
-		}
+		await logSystemAction(
+			`Penalty calculation: ${processedCount} penalt${processedCount !== 1 ? 'ies' : 'y'} applied`,
+			ActivitiesEntityTypeOptions.system
+		);
 	} catch (error) {
 		errors.push(`Job failed: ${error}`);
 	}
@@ -513,12 +509,10 @@ export async function runDefaultCheckJob(): Promise<CronJobResult> {
 			}
 		}
 
-		if (processedCount > 0) {
-			await logSystemAction(
-				`Default check completed: ${processedCount} loans marked as defaulted`,
-				ActivitiesEntityTypeOptions.system
-			);
-		}
+		await logSystemAction(
+			`Default check: ${processedCount} loan${processedCount !== 1 ? 's' : ''} marked as defaulted`,
+			ActivitiesEntityTypeOptions.system
+		);
 	} catch (error) {
 		errors.push(`Job failed: ${error}`);
 	}
@@ -617,6 +611,388 @@ export async function runSystemCleanupJob(): Promise<CronJobResult> {
 }
 
 /**
+ * Email Queue Processor Job Handler
+ * Processes pending emails in the queue and sends them via SMTP
+ */
+export async function runEmailQueueProcessorJob(): Promise<CronJobResult> {
+	const startTime = Date.now();
+	const errors: string[] = [];
+	let processedCount = 0;
+
+	try {
+		// Find all pending emails
+		const pendingEmails = await pb.collection(Collections.EmailLogs).getFullList<EmailLogsResponse>({
+			filter: `status = "${EmailLogsStatusOptions.pending}"`,
+			sort: 'created'
+		});
+
+		for (const emailLog of pendingEmails) {
+			try {
+				const sendResult = await sendMail({
+					to: emailLog.recipient_email,
+					subject: emailLog.subject || 'Notification',
+					html: emailLog.body
+				});
+
+				if (sendResult.success) {
+					await pb.collection(Collections.EmailLogs).update(emailLog.id, {
+						status: EmailLogsStatusOptions.sent,
+						sent_at: new Date().toISOString(),
+						error_message: ''
+					});
+					processedCount++;
+				} else {
+					await pb.collection(Collections.EmailLogs).update(emailLog.id, {
+						status: EmailLogsStatusOptions.failed,
+						error_message: sendResult.error || 'Send failed'
+					});
+					errors.push(`Failed to send email ${emailLog.id}: ${sendResult.error}`);
+				}
+			} catch (error) {
+				await pb.collection(Collections.EmailLogs).update(emailLog.id, {
+					status: EmailLogsStatusOptions.failed,
+					error_message: error instanceof Error ? error.message : 'Unknown error'
+				}).catch(() => {});
+				errors.push(`Failed to process email ${emailLog.id}: ${error}`);
+			}
+		}
+
+		if (processedCount > 0) {
+			await logSystemAction(
+				`Email queue processed: ${processedCount} emails sent`,
+				ActivitiesEntityTypeOptions.system
+			);
+		}
+	} catch (error) {
+		errors.push(`Job failed: ${error}`);
+	}
+
+	return {
+		success: errors.length === 0,
+		processedCount,
+		errors,
+		duration: Date.now() - startTime
+	};
+}
+
+/**
+ * Failed Email Retry Job Handler
+ * Retries sending emails that previously failed
+ */
+export async function runFailedEmailRetryJob(): Promise<CronJobResult> {
+	const startTime = Date.now();
+	const errors: string[] = [];
+	let processedCount = 0;
+
+	try {
+		// Find failed emails (only retry recent ones - within last 24 hours)
+		const oneDayAgo = addDays(new Date(), -1).toISOString();
+		const failedEmails = await pb.collection(Collections.EmailLogs).getFullList<EmailLogsResponse>({
+			filter: `status = "${EmailLogsStatusOptions.failed}" && created > "${oneDayAgo}"`,
+			sort: 'created'
+		});
+
+		for (const emailLog of failedEmails) {
+			try {
+				const sendResult = await sendMail({
+					to: emailLog.recipient_email,
+					subject: emailLog.subject || 'Notification',
+					html: emailLog.body
+				});
+
+				if (sendResult.success) {
+					await pb.collection(Collections.EmailLogs).update(emailLog.id, {
+						status: EmailLogsStatusOptions.sent,
+						sent_at: new Date().toISOString(),
+						error_message: ''
+					});
+					processedCount++;
+				} else {
+					// Leave as failed, will be retried next cycle
+					await pb.collection(Collections.EmailLogs).update(emailLog.id, {
+						error_message: `Retry failed: ${sendResult.error}`
+					});
+				}
+			} catch (error) {
+				errors.push(`Failed to retry email ${emailLog.id}: ${error}`);
+			}
+		}
+
+		if (processedCount > 0) {
+			await logSystemAction(
+				`Failed email retry completed: ${processedCount} emails re-sent`,
+				ActivitiesEntityTypeOptions.system
+			);
+		}
+	} catch (error) {
+		errors.push(`Job failed: ${error}`);
+	}
+
+	return {
+		success: errors.length === 0,
+		processedCount,
+		errors,
+		duration: Date.now() - startTime
+	};
+}
+
+/**
+ * Pre-Due Reminder Job Handler
+ * Sends reminders for loans due within 3 days (pre-due notifications)
+ */
+export async function runPreDueReminderJob(): Promise<CronJobResult> {
+	const startTime = Date.now();
+	const errors: string[] = [];
+	let processedCount = 0;
+
+	try {
+		const today = new Date();
+
+		const activeStatuses = [
+			LoansStatusOptions.disbursed,
+			LoansStatusOptions.active,
+			LoansStatusOptions.partially_paid
+		];
+		const statusFilter = activeStatuses.map(s => `status = "${s}"`).join(' || ');
+
+		const activeLoans = await pb
+			.collection(Collections.Loans)
+			.getFullList<LoanWithCustomer>({
+				filter: `(${statusFilter})`,
+				expand: 'customer'
+			});
+
+		for (const loan of activeLoans) {
+			try {
+				const dueDate = new Date(loan.due_date);
+				const daysDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+				// Only loans due in 1-3 days
+				if (daysDiff >= 1 && daysDiff <= 3) {
+					const customer = loan.expand?.customer as CustomersResponse | undefined;
+					const organization = await getOrganization();
+
+					const reminderType = daysDiff === 3
+						? TEMPLATE_KEYS.PAYMENT_REMINDER_3_DAYS
+						: daysDiff === 2
+							? TEMPLATE_KEYS.PAYMENT_REMINDER_2_DAYS
+							: TEMPLATE_KEYS.PAYMENT_REMINDER_1_DAY;
+
+					await sendTemplateEmail(
+						reminderType,
+						customer?.email || '',
+						{
+							borrower_name: customer?.name.split(' ')[0] || 'Customer',
+							due_date: formatDate(loan.due_date),
+							amount_due: formatKES(loan.balance || 0),
+							balance_remaining: formatKES(loan.balance || 0),
+							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
+							COMPANY_NAME: organization?.name || 'inuaquicklink'
+						},
+						{
+							customerId: customer?.id,
+							loanId: loan.id,
+							isAutomated: true
+						}
+					);
+
+					await logSystemAction(
+						`Pre-due reminder sent for loan ${loan.loan_number} (${daysDiff} days until due)`,
+						ActivitiesEntityTypeOptions.loan,
+						loan.id,
+						{ customerId: customer?.id, dueDate: loan.due_date, daysDiff }
+					);
+
+					processedCount++;
+				}
+			} catch (error) {
+				errors.push(`Failed to process loan ${loan.id}: ${error}`);
+			}
+		}
+
+		await logSystemAction(
+			`Pre-due reminders: ${processedCount} reminder${processedCount !== 1 ? 's' : ''} sent`,
+			ActivitiesEntityTypeOptions.system
+		);
+	} catch (error) {
+		errors.push(`Job failed: ${error}`);
+	}
+
+	return {
+		success: errors.length === 0,
+		processedCount,
+		errors,
+		duration: Date.now() - startTime
+	};
+}
+
+/**
+ * Urgent Payment Reminder Job Handler
+ * Sends urgent reminders for loans due today or already overdue
+ */
+export async function runUrgentPaymentReminderJob(): Promise<CronJobResult> {
+	const startTime = Date.now();
+	const errors: string[] = [];
+	let processedCount = 0;
+
+	try {
+		const today = new Date();
+		const todayStr = todayISO();
+
+		// Loans due today or recently overdue (within grace period)
+		const activeStatuses = [
+			LoansStatusOptions.disbursed,
+			LoansStatusOptions.active,
+			LoansStatusOptions.partially_paid,
+			LoansStatusOptions.overdue
+		];
+		const statusFilter = activeStatuses.map(s => `status = "${s}"`).join(' || ');
+
+		const urgentLoans = await pb
+			.collection(Collections.Loans)
+			.getFullList<LoanWithCustomer>({
+				filter: `(${statusFilter}) && due_date <= "${todayStr}"`,
+				expand: 'customer'
+			});
+
+		const settings = await getLoanSettings();
+
+		for (const loan of urgentLoans) {
+			try {
+				const loanSettings = getLoanSettingsFromSnapshot(loan, settings);
+				const daysOverdue = calculateDaysOverdue(loan.due_date);
+
+				// Only send urgent reminders during grace period
+				if (daysOverdue >= 0 && isInGracePeriod(daysOverdue, loanSettings)) {
+					const customer = loan.expand?.customer as CustomersResponse | undefined;
+					const organization = await getOrganization();
+
+					const template = daysOverdue === 0
+						? TEMPLATE_KEYS.PAYMENT_DUE_TODAY
+						: TEMPLATE_KEYS.DAILY_OVERDUE_REMINDER;
+
+					await sendTemplateEmail(
+						template,
+						customer?.email || '',
+						{
+							borrower_name: customer?.name.split(' ')[0] || 'Customer',
+							due_date: formatDate(loan.due_date),
+							days_overdue: daysOverdue,
+							amount_due: formatKES(loan.balance || 0),
+							balance_remaining: formatKES(loan.balance || 0),
+							grace_period_remaining: loanSettings.gracePeriodDays - daysOverdue,
+							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
+							COMPANY_NAME: organization?.name || 'inuaquicklink'
+						},
+						{
+							customerId: customer?.id,
+							loanId: loan.id,
+							isAutomated: true
+						}
+					);
+
+					processedCount++;
+				}
+			} catch (error) {
+				errors.push(`Failed to process loan ${loan.id}: ${error}`);
+			}
+		}
+
+		await logSystemAction(
+			`Urgent reminders: ${processedCount} reminder${processedCount !== 1 ? 's' : ''} sent`,
+			ActivitiesEntityTypeOptions.system
+		);
+	} catch (error) {
+		errors.push(`Job failed: ${error}`);
+	}
+
+	return {
+		success: errors.length === 0,
+		processedCount,
+		errors,
+		duration: Date.now() - startTime
+	};
+}
+
+/**
+ * Grace Period Reminder Job Handler
+ * Sends daily reminders during grace period with penalty warning
+ */
+export async function runGracePeriodReminderJob(): Promise<CronJobResult> {
+	const startTime = Date.now();
+	const errors: string[] = [];
+	let processedCount = 0;
+
+	try {
+		const settings = await getLoanSettings();
+
+		// Find overdue loans in grace period
+		const overdueLoans = await pb.collection(Collections.Loans).getFullList<LoanWithCustomer>({
+			filter: `status = "${LoansStatusOptions.overdue}"`,
+			expand: 'customer'
+		});
+
+		for (const loan of overdueLoans) {
+			try {
+				const loanSettings = getLoanSettingsFromSnapshot(loan, settings);
+				const daysOverdue = calculateDaysOverdue(loan.due_date);
+
+				if (isInGracePeriod(daysOverdue, loanSettings)) {
+					const customer = loan.expand?.customer as CustomersResponse | undefined;
+					const organization = await getOrganization();
+					const graceDaysRemaining = loanSettings.gracePeriodDays - daysOverdue;
+
+					await sendTemplateEmail(
+						TEMPLATE_KEYS.OVERDUE_GRACE_PERIOD,
+						customer?.email || '',
+						{
+							borrower_name: customer?.name.split(' ')[0] || 'Customer',
+							days_overdue: daysOverdue,
+							grace_period_remaining: graceDaysRemaining,
+							amount_due: formatKES(loan.balance || 0),
+							balance_remaining: formatKES(loan.balance || 0),
+							penalty_rate: `${(loanSettings.penaltyRate * 100).toFixed(0)}%`,
+							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
+							COMPANY_NAME: organization?.name || 'inuaquicklink'
+						},
+						{
+							customerId: customer?.id,
+							loanId: loan.id,
+							isAutomated: true
+						}
+					);
+
+					await logSystemAction(
+						`Grace period reminder sent for loan ${loan.loan_number} (${graceDaysRemaining} days remaining)`,
+						ActivitiesEntityTypeOptions.loan,
+						loan.id,
+						{ customerId: customer?.id, daysOverdue, graceDaysRemaining }
+					);
+
+					processedCount++;
+				}
+			} catch (error) {
+				errors.push(`Failed to process loan ${loan.id}: ${error}`);
+			}
+		}
+
+		await logSystemAction(
+			`Grace period reminders: ${processedCount} reminder${processedCount !== 1 ? 's' : ''} sent`,
+			ActivitiesEntityTypeOptions.system
+		);
+	} catch (error) {
+		errors.push(`Job failed: ${error}`);
+	}
+
+	return {
+		success: errors.length === 0,
+		processedCount,
+		errors,
+		duration: Date.now() - startTime
+	};
+}
+
+/**
  * Run a specific cron job by ID
  */
 export async function runCronJob(jobId: string): Promise<CronJobResult> {
@@ -633,6 +1009,16 @@ export async function runCronJob(jobId: string): Promise<CronJobResult> {
 			return runLinkExpiryCheckJob();
 		case 'system_cleanup':
 			return runSystemCleanupJob();
+		case 'email_queue_process':
+			return runEmailQueueProcessorJob();
+		case 'failed_email_retry':
+			return runFailedEmailRetryJob();
+		case 'pre_due_reminder':
+			return runPreDueReminderJob();
+		case 'urgent_payment_reminder':
+			return runUrgentPaymentReminderJob();
+		case 'grace_period_reminder':
+			return runGracePeriodReminderJob();
 		default:
 			return {
 				success: false,

@@ -138,7 +138,7 @@
 </script>
 
 <svelte:head>
-	<title>Customers | inuaquicklink</title>
+	<title>Customers | Inua Quick Link</title>
 	<meta name="description" content="Manage your customers" />
 </svelte:head>
 

@@ -28,6 +28,11 @@ export const POST: RequestHandler = async ({ params, request }: RequestEvent) =>
 		// Execute the cron job
 		const result = await runCronJob(jobId);
 
+		if (!result.success) {
+			const statusCode = result.errors.some(e => e.startsWith('Unknown job ID')) ? 404 : 500;
+			return json(result, { status: statusCode });
+		}
+
 		return json(result);
 	} catch (error) {
 		return json(

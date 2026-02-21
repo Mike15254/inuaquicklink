@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-	<title>inuaquicklink</title>
+	<title>Inua Quick Link</title>
 	<meta name="description" content="Management System" />
 </svelte:head>
 

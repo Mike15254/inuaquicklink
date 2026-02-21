@@ -1,4 +1,4 @@
 <svelte:head>
-	<title>inuaquicklink | new loans </title>
+	<title>Inua Quick Link | new loans </title>
 	<meta name="description" content="Loan managment" />
 </svelte:head>

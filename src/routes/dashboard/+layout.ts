@@ -4,7 +4,7 @@
  */
 
 import { browser } from '$app/environment';
-import { restoreSession, session } from '$lib/store/session.svelte';
+import { restoreSession, session, updateSessionOrganization } from '$lib/store/session.svelte';
 import { redirect } from '@sveltejs/kit';
 import type { LayoutLoad } from './$types';
 
@@ -21,6 +21,9 @@ export const load: LayoutLoad = async () => {
 			// Redirect to login
 			throw redirect(302, '/auth');
 		}
+
+		// Refresh org data from DB in the background so logo/name are always current
+		updateSessionOrganization().catch(() => {});
 	}
 
 	return {

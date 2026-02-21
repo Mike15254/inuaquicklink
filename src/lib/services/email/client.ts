@@ -71,13 +71,12 @@ export async function sendEmail(request: SendEmailRequest): Promise<SendEmailRes
 			emailSent = sendResult.success;
 			sendError = sendResult.error;
 			
-			if (sendResult.success) {
-				// console.log('[sendEmail] Email sent successfully via SMTP');
-			} else {
-				// console.warn('[sendEmail] SMTP send failed:', sendResult.error);
+			if (!sendResult.success) {
+				console.error('[sendEmail] SMTP send failed:', sendResult.error);
 			}
 		} else {
-			
+			console.error('[sendEmail] SMTP not configured — email will be queued as pending');
+			sendError = 'SMTP not configured';
 		}
 
 		// Log the email to database
@@ -98,8 +97,9 @@ export async function sendEmail(request: SendEmailRequest): Promise<SendEmailRes
 		}
 
 		return {
-			success: true,
-			emailLogId: emailLog.id
+			success: emailSent,
+			emailLogId: emailLog.id,
+			error: emailSent ? undefined : sendError
 		};
 	} catch (error) {
 		// Log failed email

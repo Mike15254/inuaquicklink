@@ -22,6 +22,10 @@
 		clearSession();
 		goto('/auth');
 	}
+
+	function handleProfileClick() {
+		goto('/dashboard/profile');
+	}
 </script>
 
 <Sidebar.Menu>
@@ -70,7 +74,7 @@
 				</DropdownMenu.Label>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
-					<DropdownMenu.Item>
+					<DropdownMenu.Item onclick={handleProfileClick}>
 						<UserIcon />
 						Edit Profile
 					</DropdownMenu.Item>

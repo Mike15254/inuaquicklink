@@ -23,7 +23,7 @@
 </script>
 
 <svelte:head>
-	<title>Loans | inuaquicklink</title>
+	<title>Loans | Inua Quick Link</title>
 	<meta name="description" content="Manage loans and payments" />
 </svelte:head>
 

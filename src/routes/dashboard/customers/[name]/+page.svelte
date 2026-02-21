@@ -203,7 +203,7 @@
 </script>
 
 <svelte:head>
-	<title>{customer?.name || 'Customer'} | inuaquicklink</title>
+	<title>{customer?.name || 'Customer'} | Inua Quick Link</title>
 	<meta name="description" content="Customer details and management" />
 </svelte:head>
 

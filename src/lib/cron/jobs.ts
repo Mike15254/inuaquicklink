@@ -79,6 +79,46 @@ export const CRON_JOBS: CronJobConfig[] = [
 		schedule: '0 2 * * 0', // Weekly on Sunday at 2 AM
 		description: 'Clean up old logs and temporary data',
 		enabled: true
+	},
+	{
+		id: 'email_queue_process',
+		name: 'Email Queue Processor',
+		jobType: CronJobsJobTypeOptions.system_cleanup, // Reuse type until enum updated
+		schedule: '*/10 * * * *', // Every 10 minutes
+		description: 'Process pending emails in the queue and send via SMTP',
+		enabled: true
+	},
+	{
+		id: 'failed_email_retry',
+		name: 'Failed Email Retry',
+		jobType: CronJobsJobTypeOptions.system_cleanup, // Reuse type until enum updated
+		schedule: '0 * * * *', // Every hour
+		description: 'Retry sending emails that previously failed',
+		enabled: true
+	},
+	{
+		id: 'pre_due_reminder',
+		name: 'Pre-Due Reminder',
+		jobType: CronJobsJobTypeOptions.payment_reminder,
+		schedule: '0 7 * * *', // Daily at 7 AM
+		description: 'Send pre-due reminders for loans due within 1-3 days',
+		enabled: true
+	},
+	{
+		id: 'urgent_payment_reminder',
+		name: 'Urgent Payment Reminder',
+		jobType: CronJobsJobTypeOptions.payment_reminder,
+		schedule: '0 8,12,16 * * *', // 8 AM, 12 PM, 4 PM
+		description: 'Send urgent reminders for loans due today or in grace period',
+		enabled: true
+	},
+	{
+		id: 'grace_period_reminder',
+		name: 'Grace Period Reminder',
+		jobType: CronJobsJobTypeOptions.payment_reminder,
+		schedule: '0 11 * * *', // Daily at 11 AM
+		description: 'Send daily grace period reminders with penalty warning',
+		enabled: true
 	}
 ];
 

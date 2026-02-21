@@ -1,119 +1,78 @@
 /**
  * Admin notification service
- * Sends email notifications to users with system.emails permission
- * All notifications are fire-and-forget — failures never affect the main flow
+ * Sends email notifications to the organization's notification email address.
+ * Falls back to the main organization email if notification_email is not set.
+ * All notifications are fire-and-forget — failures never affect the main flow.
  */
 
 import { pb } from '$lib/infra/db/pb';
-import {
-	Collections,
-	UsersStatusOptions,
-	type RolesResponse,
-	type UsersResponse,
-	type OrganizationResponse
-} from '$lib/types';
+import { Collections, type OrganizationResponse } from '$lib/types';
 import { sendEmail } from './client';
-import { Permission } from '../roles/permissions';
 import { formatKES } from '$lib/shared/currency';
 import { formatDate } from '$lib/shared/date_time';
 
 /**
- * Get emails of all active users whose role includes the system.emails permission
+ * Get the organization's notification recipient email.
+ * Uses notification_email if set, otherwise falls back to the main email.
  */
-async function getNotificationRecipients(): Promise<string[]> {
-	try {
-		const roles = await pb
-			.collection(Collections.Roles)
-			.getFullList<RolesResponse<string[]>>();
-
-		const eligibleRoleIds = roles
-			.filter((role) => {
-				const perms = role.permissions;
-				return Array.isArray(perms) && perms.includes(Permission.SYSTEM_EMAILS);
-			})
-			.map((role) => role.id);
-
-		if (eligibleRoleIds.length === 0) return [];
-
-		const roleFilter = eligibleRoleIds.map((id) => `role = "${id}"`).join(' || ');
-		const users = await pb.collection(Collections.Users).getFullList<UsersResponse>({
-			filter: `(${roleFilter}) && status = "${UsersStatusOptions.active}"`
-		});
-
-		return users.map((u) => u.email).filter(Boolean);
-	} catch {
-		return [];
-	}
-}
-
-/**
- * Get the organization name for email branding
- */
-async function getOrgName(): Promise<string> {
+async function getNotificationRecipient(): Promise<{ email: string; orgName: string } | null> {
 	try {
 		const orgs = await pb
 			.collection(Collections.Organization)
-			.getFullList<OrganizationResponse>();
-		if (orgs.length > 0 && orgs[0].name) return orgs[0].name;
+			.getList<OrganizationResponse>(1, 1);
+
+		const org = orgs.items[0];
+		if (!org) return null;
+
+		const email = org.notification_email?.trim() || org.email?.trim();
+		if (!email) return null;
+
+		return { email, orgName: org.name || 'Inua Quick LInk' };
 	} catch {
-		/* use default */
+		return null;
 	}
-	return 'Inua Quick Link';
 }
 
 /**
- * Simple HTML wrapper for admin notification emails
+ * Plain text HTML wrapper for admin notification emails — no decorative colors or styling.
  */
-function buildNotificationHtml(
-	title: string,
-	message: string,
-	orgName: string
-): string {
+function buildNotificationHtml(title: string, message: string, orgName: string): string {
 	return `<!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f5f5f5;">
-<div style="max-width:480px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.1);">
-  <div style="background:#1e293b;padding:16px 24px;">
-    <h2 style="margin:0;color:#fff;font-size:16px;">${title}</h2>
-  </div>
-  <div style="padding:24px;">
-    <p style="color:#334155;line-height:1.6;margin:0 0 20px;">${message}</p>
-    <p style="color:#64748b;font-size:13px;margin:0;">Open the app to view full details and take action.</p>
-  </div>
-  <div style="padding:12px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-    <p style="color:#94a3b8;font-size:11px;margin:0;">${orgName} &mdash; Automated Notification</p>
-  </div>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;">
+<div style="max-width:560px;margin:32px auto;padding:24px;">
+  <h2 style="font-size:16px;margin:0 0 16px;">${title}</h2>
+  <p style="font-size:14px;line-height:1.7;margin:0 0 16px;">${message}</p>
+  <p style="font-size:13px;margin:0 0 8px;">Open the app to view full details and take action.</p>
+  <hr style="border:none;border-top:1px solid #ccc;margin:20px 0;">
+  <p style="font-size:11px;color:#666;margin:0;">${orgName} — Automated Notification</p>
 </div>
 </body>
 </html>`;
 }
 
 /**
- * Send notification to all eligible admin users
+ * Send notification to the organization notification inbox.
  */
 async function sendAdminNotification(
 	subject: string,
 	title: string,
 	message: string
 ): Promise<void> {
-	const recipients = await getNotificationRecipients();
-	if (recipients.length === 0) return;
+	const recipient = await getNotificationRecipient();
+	if (!recipient) return;
 
-	const orgName = await getOrgName();
-	const html = buildNotificationHtml(title, message, orgName);
+	const html = buildNotificationHtml(title, message, recipient.orgName);
 
-	const sendPromises = recipients.map((email) =>
-		sendEmail({
-			to: email,
-			subject,
-			html,
-			isAutomated: true
-		}).catch(() => {
-			/* ignore individual send failures */
-		})
-	);
-
-	await Promise.allSettled(sendPromises);
+	await sendEmail({
+		to: recipient.email,
+		subject,
+		html,
+		isAutomated: true
+	}).catch(() => {
+		/* ignore send failures — never affects the main flow */
+	});
 }
 
 // ─── Notification Functions ───────────────────────────────────────

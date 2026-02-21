@@ -20,7 +20,10 @@ import { pb } from '$lib/infra/db/pb';
 	);
 
 	if (Object.keys(cleanSettings).length > 0) {
-	
+		// DEBUG: verify password is loaded correctly (remove after confirming)
+		const pass = smtpSettings.pass || '';
+		console.log(`[SMTP DEBUG] user=${smtpSettings.user}, pass length=${pass.length}, pass last4=${'*'.repeat(Math.max(0, pass.length - 4))}${pass.slice(-4)}`);
+
 		configureSmtp(cleanSettings);
 	} else {
 		// console.warn('[hooks.server] WARNING: No SMTP environment variables found in $env/dynamic/private');

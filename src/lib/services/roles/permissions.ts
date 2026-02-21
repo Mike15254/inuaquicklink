@@ -12,6 +12,7 @@ export const PermissionCategory = {
 	CUSTOMERS: 'customers',
 	LOANS: 'loans',
 	LINKS: 'links',
+	DOCUMENTS: 'documents',
 	PAYMENTS: 'payments',
 	ANALYTICS: 'analytics',
 	SETTINGS: 'settings',
@@ -74,10 +75,18 @@ export const Permission = {
 	LOANS_REJECT: 'loans.reject',
 	LOANS_DISBURSE: 'loans.disburse',
 	LOANS_EXPORT: 'loans.export',
+	LOANS_CLOSE: 'loans.close',
+	LOANS_WAIVER: 'loans.waiver',
 
 	// Application link permissions
 	LINKS_VIEW: 'links.view',
 	LINKS_CREATE: 'links.create',
+	LINKS_DELETE: 'links.delete',
+
+	// Loan document permissions
+	DOCUMENTS_VIEW: 'documents.view',
+	DOCUMENTS_UPLOAD: 'documents.upload',
+	DOCUMENTS_DELETE: 'documents.delete',
 
 	// Payment permissions
 	PAYMENTS_VIEW: 'payments.view',
@@ -104,6 +113,7 @@ export const Permission = {
 	CRM_VIEW: 'crm.view',
 	CRM_CREATE: 'crm.create',
 	CRM_UPDATE: 'crm.update',
+	CRM_DELETE: 'crm.delete',
 
 	// Activity log permissions
 	ACTIVITIES_VIEW: 'activities.view',
@@ -268,6 +278,18 @@ export const PERMISSION_DEFINITIONS: PermissionMeta[] = [
 		description: 'Export loan data',
 		category: PermissionCategory.LOANS
 	},
+	{
+		key: Permission.LOANS_CLOSE,
+		label: 'Close Loans',
+		description: 'Close or write off a loan',
+		category: PermissionCategory.LOANS
+	},
+	{
+		key: Permission.LOANS_WAIVER,
+		label: 'Grant Loan Waivers',
+		description: 'Grant penalty or balance waivers on a loan',
+		category: PermissionCategory.LOANS
+	},
 
 	// Application Links
 	{
@@ -281,6 +303,32 @@ export const PERMISSION_DEFINITIONS: PermissionMeta[] = [
 		label: 'Create Application Links',
 		description: 'Generate new application links for loan applications',
 		category: PermissionCategory.LINKS
+	},
+	{
+		key: Permission.LINKS_DELETE,
+		label: 'Delete Application Links',
+		description: 'Delete or revoke application links',
+		category: PermissionCategory.LINKS
+	},
+
+	// Documents
+	{
+		key: Permission.DOCUMENTS_VIEW,
+		label: 'View Documents',
+		description: 'View loan documents and attachments',
+		category: PermissionCategory.DOCUMENTS
+	},
+	{
+		key: Permission.DOCUMENTS_UPLOAD,
+		label: 'Upload Documents',
+		description: 'Upload documents to a loan file',
+		category: PermissionCategory.DOCUMENTS
+	},
+	{
+		key: Permission.DOCUMENTS_DELETE,
+		label: 'Delete Documents',
+		description: 'Remove documents from a loan file',
+		category: PermissionCategory.DOCUMENTS
 	},
 
 	// Payments
@@ -388,6 +436,12 @@ export const PERMISSION_DEFINITIONS: PermissionMeta[] = [
 		description: 'Update CRM entries',
 		category: PermissionCategory.CRM
 	},
+	{
+		key: Permission.CRM_DELETE,
+		label: 'Delete CRM Entries',
+		description: 'Delete CRM entries',
+		category: PermissionCategory.CRM
+	},
 
 	// Activities
 	{
@@ -406,8 +460,8 @@ export const PERMISSION_DEFINITIONS: PermissionMeta[] = [
 	// System
 	{
 		key: Permission.SYSTEM_EMAILS,
-		label: 'Email Notifications',
-		description: 'Receive system email notifications for loan events',
+		label: 'Email Notifications (Legacy)',
+		description: 'Retained for backward compatibility. Notification emails now go to the organization notification email address.',
 		category: PermissionCategory.SYSTEM
 	}
 ];
@@ -458,9 +512,13 @@ export const DEFAULT_ROLE_PERMISSIONS = {
 		Permission.LOANS_APPROVE,
 		Permission.LOANS_REJECT,
 		Permission.LOANS_DISBURSE,
+		Permission.LOANS_CLOSE,
+		Permission.LOANS_WAIVER,
 		Permission.LOANS_EXPORT,
 		Permission.LINKS_VIEW,
 		Permission.LINKS_CREATE,
+		Permission.DOCUMENTS_VIEW,
+		Permission.DOCUMENTS_UPLOAD,
 		Permission.PAYMENTS_VIEW,
 		Permission.PAYMENTS_CREATE,
 		Permission.PAYMENTS_UPDATE,
@@ -482,6 +540,8 @@ export const DEFAULT_ROLE_PERMISSIONS = {
 		Permission.LOANS_UPDATE,
 		Permission.LINKS_VIEW,
 		Permission.LINKS_CREATE,
+		Permission.DOCUMENTS_VIEW,
+		Permission.DOCUMENTS_UPLOAD,
 		Permission.PAYMENTS_VIEW,
 		Permission.PAYMENTS_CREATE,
 		Permission.CRM_VIEW,

@@ -19,7 +19,7 @@
 </script>
 
 <svelte:head>
-	<title>inuaquicklink | Settings</title>
+	<title>Inua Quick Link | Settings</title>
 	<meta name="description" content="Loan and system configuration" />
 </svelte:head>
 

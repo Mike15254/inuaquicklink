@@ -113,7 +113,7 @@
 			return;
 		}
 
-		const orgName = session.organization?.name || 'inuaquicklink';
+		const orgName = session.organization?.name || 'Inua Quick Link';
 		const orgPhone = session.organization?.phone || '';
 		const orgEmail = session.organization?.email || '';
 
@@ -219,7 +219,7 @@
 </script>
 
 <svelte:head>
-	<title>CRM | inuaquicklink</title>
+	<title>CRM | Inua Quick Link</title>
 	<meta name="description" content="Customer relationship management" />
 </svelte:head>
 

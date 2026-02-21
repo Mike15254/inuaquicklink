@@ -31,6 +31,9 @@
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import XIcon from '@lucide/svelte/icons/x';
 	import AlertTriangleIcon from '@lucide/svelte/icons/alert-triangle';
+	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 
 	interface Props {
 		data: PageData;
@@ -42,6 +45,12 @@
 	let activities = $derived(data.activities || []);
 	let entityFilter = $state('');
 	let activityFilter = $state('');
+	let showSystem = $state(false);
+
+	// Filter out system activities unless toggle is on
+	let visibleActivities = $derived(
+		showSystem ? activities : activities.filter((a) => !a.is_system)
+	);
 
 	// Sync filters from page data
 	$effect(() => {
@@ -141,7 +150,7 @@
 			case 'report_generated':
 				return DownloadIcon;
 			case 'system_action':
-				return SettingsIcon;
+				return CpuIcon;
 			default:
 				return ActivityIcon;
 		}
@@ -225,9 +234,9 @@
 	}
 
 	// Group activities by date for timeline view
-	function groupActivitiesByDate(activities: typeof data.activities) {
+	function groupActivitiesByDate(acts: typeof data.activities) {
 		const groups: Record<string, typeof data.activities> = {};
-		for (const activity of activities) {
+		for (const activity of acts) {
 			const dateKey = formatDate(activity.created);
 			if (!groups[dateKey]) {
 				groups[dateKey] = [];
@@ -237,12 +246,14 @@
 		return groups;
 	}
 
-	let groupedActivities = $derived(groupActivitiesByDate(activities));
+	let groupedActivities = $derived(groupActivitiesByDate(visibleActivities));
 	let hasFilters = $derived(entityFilter || activityFilter);
+	let systemCount = $derived(activities.filter((a) => a.is_system).length);
+	let businessCount = $derived(activities.filter((a) => !a.is_system).length);
 </script>
 
 <svelte:head>
-	<title>Activities | inuaquicklink</title>
+	<title>Activities | Inua Quick Link</title>
 	<meta name="description" content="View system activity logs" />
 </svelte:head>
 
@@ -250,7 +261,7 @@
 	<!-- Page Header -->
 	<div class="flex flex-col gap-1">
 		<h1 class="text-2xl font-semibold tracking-tight">Activity Feed</h1>
-		<p class="text-sm text-muted-foreground">Real-time system activities and audit trail</p>
+		<p class="text-sm text-muted-foreground">Business activities and audit trail</p>
 	</div>
 
 	<!-- Stats Summary -->
@@ -372,7 +383,21 @@
 				{/if}
 
 				<div class="ml-auto flex items-center gap-2">
-					<span class="text-sm text-muted-foreground">{activities.length} activities</span>
+					<Button
+						variant={showSystem ? 'default' : 'outline'}
+						size="sm"
+						onclick={() => (showSystem = !showSystem)}
+						title={showSystem ? 'Hide system/email activities' : `Show system activities (${systemCount} hidden)`}
+					>
+						{#if showSystem}
+							<EyeOffIcon class="mr-2 h-4 w-4" />
+							Hide System
+						{:else}
+							<CpuIcon class="mr-2 h-4 w-4" />
+							System ({systemCount})
+						{/if}
+					</Button>
+					<span class="text-sm text-muted-foreground">{visibleActivities.length} shown</span>
 					<Button variant="outline" size="sm" onclick={refreshActivities}>
 						<RefreshIcon class="mr-2 h-4 w-4" />
 						Refresh
@@ -383,7 +408,7 @@
 	</Card.Root>
 
 	<!-- Timeline Activity List -->
-	{#if activities.length === 0}
+	{#if visibleActivities.length === 0}
 		<Card.Root>
 			<Card.Content class="py-16">
 				<div class="flex flex-col items-center justify-center text-center">
@@ -394,6 +419,8 @@
 					<p class="mt-2 max-w-sm text-sm text-muted-foreground">
 						{#if hasFilters}
 							Try adjusting your filters to see more activities
+						{:else if !showSystem}
+							No business activities found. Click <strong>System ({systemCount})</strong> to view automated cron logs.
 						{:else}
 							Activities will appear here as actions are performed in the system
 						{/if}
@@ -452,7 +479,7 @@
 													{/if}
 													{#if activity.is_system}
 														<Badge variant="secondary" class="text-xs">
-															<SettingsIcon class="mr-1 h-3 w-3" />
+														<CpuIcon class="mr-1 h-3 w-3" />
 															System
 														</Badge>
 													{/if}

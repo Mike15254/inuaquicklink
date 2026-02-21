@@ -267,7 +267,7 @@
 </script>
 
 <svelte:head>
-	<title>Loan {loan?.loan_number || ''} | inuaquicklink</title>
+	<title>Loan {loan?.loan_number || ''} | Inua Quick Link</title>
 	<meta name="description" content="Loan details and management" />
 </svelte:head>
 

@@ -63,7 +63,7 @@
 	}
 
 	function handleProfileEdit() {
-		toast.info('Profile editing coming soon!');
+		goto('/dashboard/profile');
 	}
 </script>
 
@@ -204,7 +204,7 @@
 						<div class="mb-2 flex w-full flex-row items-center justify-between">
 							<div class="flex items-center gap-2 text-xs text-muted-foreground">
 
-								<span class="text-xs">© 2026 ® inuaquicklink. All rights reserved.</span>
+								<span class="text-xs">© 2026 ® Inua Quick Link. All rights reserved.</span>
 							</div>
 
 							<div class="flex items-center gap-2 text-xs text-muted-foreground">

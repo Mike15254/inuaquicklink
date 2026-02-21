@@ -58,6 +58,7 @@ export async function sendTemplateEmail(
     const compiled = await compileEmailTemplate(templateKey, variables);
 
     if (!compiled) {
+        console.error(`[sendTemplateEmail] Template not found in database: "${templateKey}". Check that the EmailTemplates collection has a record with template_key="${templateKey}" and is_active=true.`);
         return {
             success: false,
             error: `Email template not found: ${templateKey}`

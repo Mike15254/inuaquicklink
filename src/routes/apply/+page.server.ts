@@ -420,7 +420,7 @@ export const actions: Actions = {
 			// Send application received confirmation email
 			try {
 				// Fetch organization details for email
-				let orgName = 'inuaquicklink';
+				let orgName = 'inuaquicklink Loans';
 				let orgPhone = '+254 700 000 000';
 				let orgEmail = 'support@inuaquicklink.com';
 

@@ -405,6 +405,7 @@ export type OrganizationRecord = {
 	id: string;
 	logo?: FileNameString;
 	mpesa_paybill?: string;
+	notification_email?: string;
 	code: string
 	name: string;
 	phone: string;

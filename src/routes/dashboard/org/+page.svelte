@@ -10,21 +10,25 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { session } from '$lib/store/session.svelte';
+	import { session, updateSessionOrganization } from '$lib/store/session.svelte';
 	import { updateOrganization } from '$lib/core/org';
-	import { pb } from '$lib/infra/db/pb';
 	import { createUser, suspendUser, activateUser } from '$lib/core/users';
+	import { getFileUrl } from '$lib/infra/db/pb';
 	import { formatDate } from '$lib/shared/date_time';
 	import { toast } from 'svelte-sonner';
 	import type { PageData } from './$types';
 	import type { RoleWithPermissions } from '$lib/services/roles/role_service';
 	import { getPermissionMeta } from '$lib/services/roles/permissions';
+	import { Collections } from '$lib/types';
 
 	import BuildingIcon from '@lucide/svelte/icons/building-2';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import PhoneIcon from '@lucide/svelte/icons/phone';
 	import BankIcon from '@lucide/svelte/icons/landmark';
 	import SaveIcon from '@lucide/svelte/icons/save';
+	import BellIcon from '@lucide/svelte/icons/bell';
+	import CameraIcon from '@lucide/svelte/icons/camera';
+	import TrashIcon from '@lucide/svelte/icons/trash-2';
 	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
@@ -66,7 +70,7 @@
 		bank_account: '',
 		account_number: '',
 		mpesa_paybill: '',
-		logo: null as File | null
+		notification_email: ''
 	});
 
 	// New user dialog state
@@ -90,26 +94,74 @@
 				bank_account: session.organization.bank_account || '',
 				account_number: session.organization.account_number || '',
 				mpesa_paybill: session.organization.mpesa_paybill || '',
-				logo: null
+				notification_email: session.organization.notification_email || ''
 			};
 		}
 	});
 
-	function handleFileSelect(event: Event) {
+	// Logo upload state (standalone — not coupled to main form save)
+	let isUploadingLogo = $state(false);
+	let isRemovingLogo = $state(false);
+	let logoPreview = $state<string | null>(null);
+	let logoFileInput = $state<HTMLInputElement | null>(null);
+
+	let orgLogoUrl = $derived(
+		logoPreview ??
+		(session.organization?.logo
+			? getFileUrl(Collections.Organization, session.organization.id, session.organization.logo)
+			: null)
+	);
+
+	function handleLogoFileSelect(event: Event) {
 		const input = event.target as HTMLInputElement;
-		if (input.files && input.files.length > 0) {
-			profileForm.logo = input.files[0];
+		if (!input.files?.[0]) return;
+		const file = input.files[0];
+		logoPreview = URL.createObjectURL(file);
+		uploadLogo(file);
+	}
+
+	async function uploadLogo(file: File) {
+		if (!session.organization) return;
+		isUploadingLogo = true;
+		try {
+			const permissions = session.permissions || [];
+			const actorId = session.user?.id || '';
+			await updateOrganization(
+				session.organization.id,
+				{ logo: file },
+				permissions,
+				actorId
+			);
+			await updateSessionOrganization();
+			toast.success('Logo updated');
+		} catch (err) {
+			logoPreview = null;
+			toast.error(err instanceof Error ? err.message : 'Failed to upload logo');
+		} finally {
+			isUploadingLogo = false;
 		}
 	}
 
-	function getOrgLogoUrl(org: any) {
-		if (profileForm.logo) {
-			return URL.createObjectURL(profileForm.logo);
+	async function handleRemoveLogo() {
+		if (!session.organization) return;
+		isRemovingLogo = true;
+		try {
+			const permissions = session.permissions || [];
+			const actorId = session.user?.id || '';
+			await updateOrganization(
+				session.organization.id,
+				{ logo: null },
+				permissions,
+				actorId
+			);
+			logoPreview = null;
+			await updateSessionOrganization();
+			toast.success('Logo removed');
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Failed to remove logo');
+		} finally {
+			isRemovingLogo = false;
 		}
-		if (org?.logo) {
-			return pb.files.getURL(org, org.logo);
-		}
-		return null;
 	}
 
 	function handleTabChange(value: string) {
@@ -124,7 +176,8 @@
 		isSavingProfile = true;
 		try {
 			const permissions = session.permissions || [];
-			await updateOrganization(session.organization.id, profileForm, permissions);
+			const actorId = session.user?.id || '';
+			await updateOrganization(session.organization.id, profileForm, permissions, actorId);
 			toast.success('Organization updated successfully');
 			isEditingProfile = false;
 		} catch (error) {
@@ -145,7 +198,7 @@
 				bank_account: session.organization.bank_account || '',
 				account_number: session.organization.account_number || '',
 				mpesa_paybill: session.organization.mpesa_paybill || '',
-				logo: null
+				notification_email: session.organization.notification_email || ''
 			};
 		}
 		isEditingProfile = false;
@@ -227,7 +280,7 @@
 </script>
 
 <svelte:head>
-	<title>Organization | inuaquicklink</title>
+	<title>Organization | Inua Quick Link</title>
 	<meta name="description" content="Manage your organization profile and team" />
 </svelte:head>
 
@@ -273,33 +326,61 @@
 						<Card.Description>Basic information and contact details</Card.Description>
 					</Card.Header>
 					<Card.Content class="space-y-6">
-						<div class="grid gap-4 sm:grid-cols-2">
-							<div class="space-y-2 sm:col-span-2">
-								<Label>Organization Logo</Label>
-								<div class="flex items-center gap-4">
-									<div class="relative h-16 w-16 overflow-hidden rounded-lg border bg-muted">
-										{#if getOrgLogoUrl(session.organization)}
-											<img
-												src={getOrgLogoUrl(session.organization)}
-												alt="Organization Logo"
-												class="h-full w-full object-cover"
-											/>
-										{:else}
-											<div class="flex h-full w-full items-center justify-center">
-												<BuildingIcon class="h-8 w-8 text-muted-foreground/50" />
-											</div>
-										{/if}
-									</div>
-									{#if isEditingProfile}
-										<Input
-											type="file"
-											accept="image/*"
-											onchange={handleFileSelect}
-											class="max-w-[250px]"
+						<!-- Logo Section -->
+						<div class="space-y-2">
+							<Label>Organization Logo</Label>
+							<div class="flex items-center gap-6">
+								<div class="relative h-20 w-20 overflow-hidden rounded-lg border bg-muted">
+									{#if orgLogoUrl}
+										<img
+											src={orgLogoUrl}
+											alt="Organization Logo"
+											class="h-full w-full object-cover"
 										/>
+									{:else}
+										<div class="flex h-full w-full items-center justify-center">
+											<BuildingIcon class="h-8 w-8 text-muted-foreground/50" />
+										</div>
+									{/if}
+									{#if isUploadingLogo || isRemovingLogo}
+										<div class="absolute inset-0 flex items-center justify-center bg-background/70">
+											<LoaderIcon class="h-5 w-5 animate-spin" />
+										</div>
+									{/if}
+								</div>
+								<div class="flex flex-col gap-2">
+									<input
+										bind:this={logoFileInput}
+										type="file"
+										accept="image/*"
+										class="hidden"
+										onchange={handleLogoFileSelect}
+									/>
+									<Button
+										variant="outline"
+										size="sm"
+										onclick={() => logoFileInput?.click()}
+										disabled={isUploadingLogo || isRemovingLogo}
+									>
+										<CameraIcon class="mr-2 h-4 w-4" />
+										Upload Logo
+									</Button>
+									{#if session.organization?.logo || logoPreview}
+										<Button
+											variant="ghost"
+											size="sm"
+											onclick={handleRemoveLogo}
+											disabled={isUploadingLogo || isRemovingLogo}
+											class="text-destructive hover:text-destructive"
+										>
+											<TrashIcon class="mr-2 h-4 w-4" />
+											Remove
+										</Button>
 									{/if}
 								</div>
 							</div>
+						</div>
+						<div class="grid gap-4 sm:grid-cols-2">
 							<div class="space-y-2">
 								<Label for="org-name">Organization Name</Label>
 								<Input
@@ -393,7 +474,38 @@
 								/>
 							</div>
 						</div>
-					</Card.Content>
+					</Card.Content>					</Card.Root>
+
+					<Card.Root>
+						<Card.Header>
+							<div class="flex items-center gap-2">
+								<BellIcon class="h-5 w-5 text-primary" />
+								<Card.Title>Notifications</Card.Title>
+							</div>
+							<Card.Description>Email address that receives system notifications (loan events, alerts, daily summaries).
+								Leave empty to use the main organization email.</Card.Description>
+						</Card.Header>
+						<Card.Content>
+							<div class="max-w-sm space-y-2">
+								<Label for="notification-email">Notification Email</Label>
+								<div class="relative">
+									<MailIcon
+										class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+									/>
+									<Input
+										id="notification-email"
+										type="email"
+										class="pl-10"
+										placeholder={session.organization?.email || 'notifications@example.com'}
+										bind:value={profileForm.notification_email}
+										disabled={!isEditingProfile}
+									/>
+								</div>
+								{#if !isEditingProfile && !session.organization?.notification_email}
+									<p class="text-xs text-muted-foreground">Using fallback: {session.organization?.email}</p>
+								{/if}
+							</div>
+						</Card.Content>
 					<Card.Footer class="flex justify-end gap-2">
 						{#if isEditingProfile}
 							<Button variant="outline" onclick={handleCancelProfile} disabled={isSavingProfile}>
@@ -457,7 +569,7 @@
 												<div class="relative h-8 w-8 overflow-hidden rounded-full bg-muted">
 													{#if user.avatar}
 														<img
-															src={pb.files.getURL(user, user.avatar)}
+															src={getFileUrl(Collections.Users, user.id, user.avatar)}
 															alt={user.name}
 															class="h-full w-full object-cover"
 														/>

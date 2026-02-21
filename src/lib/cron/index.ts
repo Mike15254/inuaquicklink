@@ -10,7 +10,12 @@ export {
 	runOverdueCheckJob,
 	runPenaltyCalculationJob,
 	runLinkExpiryCheckJob,
-	runSystemCleanupJob
+	runSystemCleanupJob,
+	runEmailQueueProcessorJob,
+	runFailedEmailRetryJob,
+	runPreDueReminderJob,
+	runUrgentPaymentReminderJob,
+	runGracePeriodReminderJob
 } from './handlers';
 
 export {
