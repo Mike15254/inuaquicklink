@@ -405,7 +405,7 @@ export type OrganizationRecord = {
 	id: string;
 	logo?: FileNameString;
 	mpesa_paybill?: string;
-	notification_email?: string;
+	notification_email?: string | string[] | null; // JSON field: can be string (legacy) or array of emails
 	code: string
 	name: string;
 	phone: string;

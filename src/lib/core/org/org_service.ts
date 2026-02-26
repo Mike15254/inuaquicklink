@@ -20,7 +20,7 @@ export interface UpdateOrganizationInput {
 	bank_account?: string;
 	account_number?: string;
 	mpesa_paybill?: string;
-	notification_email?: string;
+	notification_email?: string | string[] | null; // JSON field: string or array of emails
 	logo?: File | null;
 }
 
@@ -138,7 +138,21 @@ export async function updateOrganization(
 	if (input.bank_account !== undefined) updateData.bank_account = input.bank_account.trim();
 	if (input.account_number !== undefined) updateData.account_number = input.account_number.trim();
 	if (input.mpesa_paybill !== undefined) updateData.mpesa_paybill = input.mpesa_paybill.trim();
-	if (input.notification_email !== undefined) updateData.notification_email = input.notification_email.trim();
+	if (input.notification_email !== undefined) {
+		// Handle JSON field: can be string, array, or null
+		if (Array.isArray(input.notification_email)) {
+			// Filter empty emails and trim
+			const filtered = input.notification_email
+				.map(e => e.trim())
+				.filter(e => e.length > 0);
+			updateData.notification_email = filtered.length > 0 ? filtered : null;
+		} else if (typeof input.notification_email === 'string') {
+			const trimmed = input.notification_email.trim();
+			updateData.notification_email = trimmed.length > 0 ? trimmed : null;
+		} else {
+			updateData.notification_email = null;
+		}
+	}
 	if (input.logo !== undefined) updateData.logo = input.logo;
 
 	const organization = await pb.collection(Collections.Organization).update<OrganizationResponse>(orgId, updateData);

@@ -34,6 +34,8 @@
 	import UserPlusIcon from '@lucide/svelte/icons/user-plus';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import UserIcon from '@lucide/svelte/icons/user';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import XIcon from '@lucide/svelte/icons/x';
 
 	interface Props {
 		data: PageData;
@@ -70,8 +72,11 @@
 		bank_account: '',
 		account_number: '',
 		mpesa_paybill: '',
-		notification_email: ''
+		notification_email: [] as string[] // JSON field storing array of emails
 	});
+
+	// Notification emails management
+	let newNotificationEmail = $state('');
 
 	// New user dialog state
 	let showAddUserDialog = $state(false);
@@ -86,6 +91,15 @@
 	// Sync profile form from session
 	$effect(() => {
 		if (session.organization) {
+			// Parse notification_email JSON field (can be string or array)
+			let notificationEmails: string[] = [];
+			if (Array.isArray(session.organization.notification_email)) {
+				notificationEmails = [...session.organization.notification_email];
+			} else if (typeof session.organization.notification_email === 'string' && session.organization.notification_email) {
+				// Legacy: single email string - migrate to array
+				notificationEmails = [session.organization.notification_email];
+			}
+			
 			profileForm = {
 				name: session.organization.name || '',
 				email: session.organization.email || '',
@@ -94,8 +108,9 @@
 				bank_account: session.organization.bank_account || '',
 				account_number: session.organization.account_number || '',
 				mpesa_paybill: session.organization.mpesa_paybill || '',
-				notification_email: session.organization.notification_email || ''
+				notification_email: notificationEmails
 			};
+			newNotificationEmail = '';
 		}
 	});
 
@@ -190,6 +205,15 @@
 
 	function handleCancelProfile() {
 		if (session.organization) {
+			// Parse notification_email JSON field (can be string or array)
+			let notificationEmails: string[] = [];
+			if (Array.isArray(session.organization.notification_email)) {
+				notificationEmails = [...session.organization.notification_email];
+			} else if (typeof session.organization.notification_email === 'string' && session.organization.notification_email) {
+				// Legacy: single email string - migrate to array
+				notificationEmails = [session.organization.notification_email];
+			}
+			
 			profileForm = {
 				name: session.organization.name || '',
 				email: session.organization.email || '',
@@ -198,10 +222,46 @@
 				bank_account: session.organization.bank_account || '',
 				account_number: session.organization.account_number || '',
 				mpesa_paybill: session.organization.mpesa_paybill || '',
-				notification_email: session.organization.notification_email || ''
+				notification_email: notificationEmails
 			};
+			newNotificationEmail = '';
 		}
 		isEditingProfile = false;
+	}
+
+	function handleAddNotificationEmail() {
+		const email = newNotificationEmail.trim();
+		if (!email) {
+			toast.error('Please enter an email address');
+			return;
+		}
+		
+		// Basic email validation
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
+			toast.error('Please enter a valid email address');
+			return;
+		}
+		
+		// Check for duplicates
+		if (profileForm.notification_email.includes(email)) {
+			toast.error('This email is already in the list');
+			return;
+		}
+		
+		profileForm.notification_email = [...profileForm.notification_email, email];
+		newNotificationEmail = '';
+	}
+
+	function handleRemoveNotificationEmail(email: string) {
+		profileForm.notification_email = profileForm.notification_email.filter(e => e !== email);
+	}
+
+	function handleNotificationEmailKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			handleAddNotificationEmail();
+		}
 	}
 
 	async function handleCreateUser() {
@@ -482,27 +542,74 @@
 								<BellIcon class="h-5 w-5 text-primary" />
 								<Card.Title>Notifications</Card.Title>
 							</div>
-							<Card.Description>Email address that receives system notifications (loan events, alerts, daily summaries).
-								Leave empty to use the main organization email.</Card.Description>
+							<Card.Description>
+								Email addresses that receive system notifications (loan events, alerts, daily summaries).
+								If none are configured, notifications will be sent to the main organization email.
+							</Card.Description>
 						</Card.Header>
 						<Card.Content>
-							<div class="max-w-sm space-y-2">
-								<Label for="notification-email">Notification Email</Label>
-								<div class="relative">
-									<MailIcon
-										class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-									/>
-									<Input
-										id="notification-email"
-										type="email"
-										class="pl-10"
-										placeholder={session.organization?.email || 'notifications@example.com'}
-										bind:value={profileForm.notification_email}
-										disabled={!isEditingProfile}
-									/>
-								</div>
-								{#if !isEditingProfile && !session.organization?.notification_email}
-									<p class="text-xs text-muted-foreground">Using fallback: {session.organization?.email}</p>
+							<div class="space-y-4">
+								<!-- List of current notification emails -->
+								{#if profileForm.notification_email.length > 0}
+									<div class="space-y-2">
+										<Label>Notification Recipients</Label>
+										<div class="space-y-2">
+											{#each profileForm.notification_email as email, index (email)}
+												<div class="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
+													<MailIcon class="h-4 w-4 text-muted-foreground" />
+													<span class="flex-1 text-sm">{email}</span>
+													{#if isEditingProfile}
+														<Button
+															size="sm"
+															variant="ghost"
+															class="h-7 w-7 p-0"
+															onclick={() => handleRemoveNotificationEmail(email)}
+														>
+															<XIcon class="h-4 w-4" />
+														</Button>
+													{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+								{:else if !isEditingProfile}
+									<div class="rounded-md border border-dashed px-4 py-3">
+										<p class="text-sm text-muted-foreground">
+											No notification emails configured. Using fallback: <strong>{session.organization?.email}</strong>
+										</p>
+									</div>
+								{/if}
+
+								<!-- Add new email input (only in edit mode) -->
+								{#if isEditingProfile}
+									<div class="space-y-2">
+										<Label for="new-notification-email">Add Notification Email</Label>
+										<div class="flex gap-2">
+											<div class="relative flex-1">
+												<MailIcon
+													class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+												/>
+												<Input
+													id="new-notification-email"
+													type="email"
+													class="pl-10"
+													placeholder="email@example.com"
+													bind:value={newNotificationEmail}
+													onkeydown={handleNotificationEmailKeydown}
+												/>
+											</div>
+											<Button
+												type="button"
+												variant="outline"
+												onclick={handleAddNotificationEmail}
+											>
+												<PlusIcon class="h-4 w-4" />
+											</Button>
+										</div>
+										<p class="text-xs text-muted-foreground">
+											Press Enter or click + to add the email address
+										</p>
+									</div>
 								{/if}
 							</div>
 						</Card.Content>

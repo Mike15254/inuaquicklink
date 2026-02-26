@@ -12,10 +12,13 @@ import { formatKES } from '$lib/shared/currency';
 import { formatDate } from '$lib/shared/date_time';
 
 /**
- * Get the organization's notification recipient email.
- * Uses notification_email if set, otherwise falls back to the main email.
+ * Get the organization's notification recipient emails.
+ * notification_email is a JSON field that can be:
+ * - string (legacy single email)
+ * - string[] (new multi-email format)
+ * Falls back to main organization email if not set.
  */
-async function getNotificationRecipient(): Promise<{ email: string; orgName: string } | null> {
+async function getNotificationRecipients(): Promise<{ emails: string[]; orgName: string } | null> {
 	try {
 		const orgs = await pb
 			.collection(Collections.Organization)
@@ -24,10 +27,29 @@ async function getNotificationRecipient(): Promise<{ email: string; orgName: str
 		const org = orgs.items[0];
 		if (!org) return null;
 
-		const email = org.notification_email?.trim() || org.email?.trim();
-		if (!email) return null;
+		let emails: string[] = [];
+		
+		// Parse notification_email JSON field (can be string or array)
+		if (org.notification_email) {
+			if (Array.isArray(org.notification_email)) {
+				// New format: array of emails
+				emails = org.notification_email
+					.map(e => typeof e === 'string' ? e.trim() : '')
+					.filter(e => e.length > 0);
+			} else if (typeof org.notification_email === 'string' && org.notification_email.trim()) {
+				// Legacy format: single email string
+				emails = [org.notification_email.trim()];
+			}
+		}
+		
+		// Fall back to main organization email
+		if (emails.length === 0 && org.email?.trim()) {
+			emails = [org.email.trim()];
+		}
 
-		return { email, orgName: org.name || 'Inua Quick LInk' };
+		if (emails.length === 0) return null;
+
+		return { emails, orgName: org.name };
 	} catch {
 		return null;
 	}
@@ -54,25 +76,31 @@ function buildNotificationHtml(title: string, message: string, orgName: string):
 
 /**
  * Send notification to the organization notification inbox.
+ * Sends to all configured notification email addresses.
  */
 async function sendAdminNotification(
 	subject: string,
 	title: string,
 	message: string
 ): Promise<void> {
-	const recipient = await getNotificationRecipient();
-	if (!recipient) return;
+	const recipients = await getNotificationRecipients();
+	if (!recipients || recipients.emails.length === 0) return;
 
-	const html = buildNotificationHtml(title, message, recipient.orgName);
+	const html = buildNotificationHtml(title, message, recipients.orgName);
 
-	await sendEmail({
-		to: recipient.email,
-		subject,
-		html,
-		isAutomated: true
-	}).catch(() => {
-		/* ignore send failures — never affects the main flow */
-	});
+	// Send to all notification emails
+	const sendPromises = recipients.emails.map((email) =>
+		sendEmail({
+			to: email,
+			subject,
+			html,
+			isAutomated: true
+		}).catch(() => {
+			/* ignore individual send failures — never affects the main flow */
+		})
+	);
+
+	await Promise.allSettled(sendPromises);
 }
 
 // ─── Notification Functions ───────────────────────────────────────
