@@ -139,16 +139,17 @@ export async function updateOrganization(
 	if (input.account_number !== undefined) updateData.account_number = input.account_number.trim();
 	if (input.mpesa_paybill !== undefined) updateData.mpesa_paybill = input.mpesa_paybill.trim();
 	if (input.notification_email !== undefined) {
-		// Handle JSON field: can be string, array, or null
+		// Handle JSON field: must be JSON.stringify'd so PocketBase stores it
+		// as a single JSON value rather than multiple form-data entries.
 		if (Array.isArray(input.notification_email)) {
 			// Filter empty emails and trim
 			const filtered = input.notification_email
 				.map(e => e.trim())
 				.filter(e => e.length > 0);
-			updateData.notification_email = filtered.length > 0 ? filtered : null;
+			updateData.notification_email = filtered.length > 0 ? JSON.stringify(filtered) : null;
 		} else if (typeof input.notification_email === 'string') {
 			const trimmed = input.notification_email.trim();
-			updateData.notification_email = trimmed.length > 0 ? trimmed : null;
+			updateData.notification_email = trimmed.length > 0 ? JSON.stringify(trimmed) : null;
 		} else {
 			updateData.notification_email = null;
 		}

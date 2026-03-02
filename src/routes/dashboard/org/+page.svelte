@@ -88,9 +88,11 @@
 		roleId: ''
 	});
 
-	// Sync profile form from session
+	// Sync profile form from session — but never overwrite while the user is actively editing,
+	// because background calls to updateSessionOrganization() (triggered by layout navigations)
+	// replace session.organization, which would fire this effect and wipe unsaved changes.
 	$effect(() => {
-		if (session.organization) {
+		if (session.organization && !isEditingProfile) {
 			// Parse notification_email JSON field (can be string or array)
 			let notificationEmails: string[] = [];
 			if (Array.isArray(session.organization.notification_email)) {
@@ -188,11 +190,21 @@
 	async function handleSaveProfile() {
 		if (!session.organization) return;
 
+		// Auto-flush any email that's been typed but not yet added via the + button
+		if (newNotificationEmail.trim()) {
+			handleAddNotificationEmail();
+			// If the email was invalid/duplicate, handleAddNotificationEmail shows a toast and returns early.
+			// Re-check: if newNotificationEmail is still set, it means add was rejected — abort save.
+			if (newNotificationEmail.trim()) return;
+		}
+
 		isSavingProfile = true;
 		try {
 			const permissions = session.permissions || [];
 			const actorId = session.user?.id || '';
 			await updateOrganization(session.organization.id, profileForm, permissions, actorId);
+			// Refresh session with the updated organization data from DB
+			await updateSessionOrganization();
 			toast.success('Organization updated successfully');
 			isEditingProfile = false;
 		} catch (error) {
@@ -340,7 +352,7 @@
 </script>
 
 <svelte:head>
-	<title>Organization | Inua Quick Link</title>
+	<title>Organization | Njenga Focus Team</title>
 	<meta name="description" content="Manage your organization profile and team" />
 </svelte:head>
 
