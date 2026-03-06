@@ -201,7 +201,14 @@ export function formatRelativeTime(dateInput: string | Date): string {
 /**
  * Format due date status for display
  */
-export function formatDueStatus(dueDate: string | Date): { text: string; isOverdue: boolean } {
+export function formatDueStatus(
+	dueDate: string | Date,
+	status?: string
+): { text: string; isOverdue: boolean } {
+	if (status === 'repaid' || status === 'closed') {
+		return { text: 'Fully repaid', isOverdue: false };
+	}
+
 	const daysOverdue = calculateDaysOverdue(dueDate);
 
 	if (daysOverdue > 0) {

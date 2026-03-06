@@ -83,7 +83,7 @@
 	// Derived values
 	let businessCode = 'dashboard';
 	let workflowInfo = $derived(loan ? getWorkflowStatus(loan) : null);
-	let dueStatus = $derived(loan ? formatDueStatus(loan.due_date) : null);
+	let dueStatus = $derived(loan ? formatDueStatus(loan.due_date, loan.status) : null);
 	let customer = $derived(loan?.expand?.customer);
 
 	// Permissions
@@ -267,7 +267,7 @@
 </script>
 
 <svelte:head>
-	<title>Loan {loan?.loan_number || ''} | Inua Quick Link</title>
+	<title>Loan {loan?.loan_number || ''}</title>
 	<meta name="description" content="Loan details and management" />
 </svelte:head>
 

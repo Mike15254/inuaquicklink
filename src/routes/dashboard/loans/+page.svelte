@@ -359,7 +359,7 @@
 			{:else}
 				{#each loans as loan (loan.id)}
 					{@const customer = loan.expand?.customer}
-					{@const loanDueStatus = formatDueStatus(loan.due_date)}
+					{@const loanDueStatus = formatDueStatus(loan.due_date, loan.status)}
 					<Table.Row
 						class="cursor-pointer hover:bg-muted/50"
 						onclick={() => openLoanDetail(loan.id)}
