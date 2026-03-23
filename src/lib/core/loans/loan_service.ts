@@ -398,7 +398,24 @@ export async function getLoans(
 	const filterParts: string[] = [];
 
 	if (filters?.status) {
-		filterParts.push(`status = "${filters.status}"`);
+		if (filters.status === LoansStatusOptions.overdue) {
+			// "Overdue" is a computed state: any active loan past its due date,
+			// including those in grace period (overdue), penalty accruing, or
+			// not yet processed by cron (disbursed/active/partially_paid).
+			const today = new Date().toISOString();
+			const overdueStatuses = [
+				LoansStatusOptions.disbursed,
+				LoansStatusOptions.active,
+				LoansStatusOptions.partially_paid,
+				LoansStatusOptions.overdue,
+				LoansStatusOptions.penalty_accruing
+			]
+				.map((s) => `status = "${s}"`)
+				.join(' || ');
+			filterParts.push(`(${overdueStatuses}) && due_date < "${today}"`);
+		} else {
+			filterParts.push(`status = "${filters.status}"`);
+		}
 	}
 
 	if (filters?.customerId) {

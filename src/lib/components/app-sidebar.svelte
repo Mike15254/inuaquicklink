@@ -43,6 +43,10 @@
 							url: `${baseUrl}/loans?status=disbursed`
 						},
 						{
+							title: 'Overdue',
+							url: `${baseUrl}/loans?status=overdue`
+						},
+						{
 							title: 'Defaulted',
 							url: `${baseUrl}/loans?status=defaulted`
 						},
