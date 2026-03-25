@@ -97,6 +97,7 @@ export function calculateTotalRepayment(
 /**
  * Calculate late payment penalty (ONE-TIME, not compounding)
  * Penalty is only applied after grace period ends
+ * @deprecated Use calculateCumulativePenalty for daily accrual behaviour
  */
 export function calculatePenalty(
 	totalRepayment: number,
@@ -107,6 +108,37 @@ export function calculatePenalty(
 	if (daysOverdue <= settings.gracePeriodDays) return 0;
 	// ONE-TIME penalty (not cumulative per day)
 	return roundCurrency(totalRepayment * settings.penaltyRate);
+}
+
+/**
+ * Calculate the daily penalty increment.
+ * Each day after the grace period: penaltyRate × principal loan amount.
+ */
+export function calculateDailyPenalty(
+	principalAmount: number,
+	settings: LoanCalculationSettings = DEFAULT_LOAN_SETTINGS
+): number {
+	return roundCurrency(principalAmount * settings.penaltyRate);
+}
+
+/**
+ * Calculate total CUMULATIVE daily penalty.
+ * Starting from day (gracePeriodDays + 1), penaltyRate% of the principal is
+ * added to the balance every day until the penalty period ends.
+ *
+ * totalPenalty = daysInPenaltyPeriod × (penaltyRate × principal)
+ */
+export function calculateCumulativePenalty(
+	principalAmount: number,
+	daysOverdue: number,
+	settings: LoanCalculationSettings = DEFAULT_LOAN_SETTINGS
+): number {
+	if (daysOverdue <= settings.gracePeriodDays) return 0;
+	const daysInPenaltyPeriod = Math.min(
+		daysOverdue - settings.gracePeriodDays,
+		settings.penaltyPeriodDays
+	);
+	return roundCurrency(daysInPenaltyPeriod * principalAmount * settings.penaltyRate);
 }
 
 /**

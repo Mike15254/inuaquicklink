@@ -501,7 +501,10 @@ export async function markAsDefaulted(
 
 	const validStatuses = [
 		LoansStatusOptions.disbursed,
-		LoansStatusOptions.partially_paid
+		LoansStatusOptions.active,
+		LoansStatusOptions.partially_paid,
+		LoansStatusOptions.overdue,
+		LoansStatusOptions.penalty_accruing
 	];
 
 	if (!validStatuses.includes(loan.status as LoansStatusOptions)) {
@@ -657,10 +660,13 @@ export async function recordPaymentWithEmail(
 
 	const loan = await getLoanById(input.loanId);
 
-	// Allow payments on disbursed, partially_paid, or defaulted loans
+	// Allow payments on any active or overdue loan
 	const validStatuses = [
 		LoansStatusOptions.disbursed,
+		LoansStatusOptions.active,
 		LoansStatusOptions.partially_paid,
+		LoansStatusOptions.overdue,
+		LoansStatusOptions.penalty_accruing,
 		LoansStatusOptions.defaulted
 	];
 
@@ -677,10 +683,20 @@ export async function recordPaymentWithEmail(
 	const newBalance = Math.max(0, currentBalance - input.amount);
 
 	// Determine new status
+	// Overdue / penalty_accruing / defaulted loans keep their status on partial payment.
+	// Only clean-active loans (disbursed/active) transition to partially_paid.
+	const overdueStatuses = [
+		LoansStatusOptions.overdue,
+		LoansStatusOptions.penalty_accruing,
+		LoansStatusOptions.defaulted
+	];
 	let newStatus = loan.status;
 	if (newBalance <= 0) {
 		newStatus = LoansStatusOptions.repaid;
-	} else if (newAmountPaid > 0 && loan.status !== LoansStatusOptions.defaulted) {
+	} else if (
+		newAmountPaid > 0 &&
+		!overdueStatuses.includes(loan.status as LoansStatusOptions)
+	) {
 		newStatus = LoansStatusOptions.partially_paid;
 	}
 
@@ -751,6 +767,8 @@ export async function recordPaymentWithEmail(
 	try {
 		await notifyPaymentRecorded({
 			customerName: customer.name,
+			customerPhone: customer.phone,
+			customerEmail: customer.email,
 			loanNumber: loan.loan_number,
 			amountPaid: input.amount,
 			newBalance,

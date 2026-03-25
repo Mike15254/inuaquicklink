@@ -98,10 +98,35 @@ export function getWorkflowStatus(loan: LoansResponse): WorkflowStatusInfo {
 				isComplete: false
 			};
 		case LoansStatusOptions.disbursed:
+		case LoansStatusOptions.active:
 		case LoansStatusOptions.partially_paid:
 			return {
 				step: 3,
 				stepName: 'Active Loan',
+				canApprove: false,
+				canReject: false,
+				canDisburse: false,
+				canRecordPayment: true,
+				canWaivePenalty: (loan.penalty_amount || 0) > 0,
+				canMarkDefaulted: true,
+				isComplete: false
+			};
+		case LoansStatusOptions.overdue:
+			return {
+				step: 3,
+				stepName: 'Overdue',
+				canApprove: false,
+				canReject: false,
+				canDisburse: false,
+				canRecordPayment: true,
+				canWaivePenalty: (loan.penalty_amount || 0) > 0,
+				canMarkDefaulted: true,
+				isComplete: false
+			};
+		case LoansStatusOptions.penalty_accruing:
+			return {
+				step: 3,
+				stepName: 'Penalty Accruing',
 				canApprove: false,
 				canReject: false,
 				canDisburse: false,
@@ -131,6 +156,18 @@ export function getWorkflowStatus(loan: LoansResponse): WorkflowStatusInfo {
 				canDisburse: false,
 				canRecordPayment: true, // Allow recovery payments
 				canWaivePenalty: (loan.penalty_amount || 0) > 0,
+				canMarkDefaulted: false,
+				isComplete: false
+			};
+		case LoansStatusOptions.closed:
+			return {
+				step: 5,
+				stepName: 'Closed',
+				canApprove: false,
+				canReject: false,
+				canDisburse: false,
+				canRecordPayment: false,
+				canWaivePenalty: false,
 				canMarkDefaulted: false,
 				isComplete: true
 			};

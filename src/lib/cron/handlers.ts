@@ -19,11 +19,12 @@ import { formatKES } from '$lib/shared/currency';
 import { sendTemplateEmail, TEMPLATE_KEYS } from '$lib/services/email/email_template_service';
 import { logSystemAction } from '$lib/core/activity/activity_service';
 import type { CronJobResult } from './jobs';
-import { notifyDueAndOverdueLoans } from '$lib/services/email/notification_service';
+import { notifyDueAndOverdueLoans, notifyPenaltyApplied, notifyLoanAutoDefaulted } from '$lib/services/email/notification_service';
 import { sendMail } from '$lib/services/email/transport';
 import { EmailLogsStatusOptions, type EmailLogsResponse } from '$lib/types';
 import {
 	calculatePenalty,
+	calculateCumulativePenalty,
 	isInGracePeriod,
 	isInPenaltyPeriod,
 	shouldBeDefaulted,
@@ -157,7 +158,7 @@ export async function runPaymentReminderJob(): Promise<CronJobResult> {
 							amount_due: formatKES(loan.balance || 0),
 							balance_remaining: formatKES(loan.balance || 0),
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name || 'richdencapital'
 						},
 						{
 							customerId: customer?.id,
@@ -271,7 +272,7 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 							amount_due: formatKES(loan.balance || 0),
 							balance_remaining: formatKES(loan.balance || 0),
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name || 'richdencapital'
 						},
 						{
 							customerId: customer?.id,
@@ -300,7 +301,7 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 			ActivitiesEntityTypeOptions.system
 		);
 
-		// Notify admins about overdue loans
+		// Notify admins about overdue loans with customer contact details
 		if (overdueLoans.length > 0) {
 			try {
 				const totalOverdueAmount = overdueLoans.reduce(
@@ -310,7 +311,19 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 				await notifyDueAndOverdueLoans({
 					dueTodayCount: 0,
 					overdueCount: overdueLoans.length,
-					totalOverdueAmount
+					totalOverdueAmount,
+					overdueLoans: overdueLoans.map((loan) => {
+						const customer = loan.expand?.customer as CustomersResponse | undefined;
+						return {
+							customerName: customer?.name || 'Unknown Customer',
+							customerPhone: customer?.phone,
+							customerEmail: customer?.email,
+							loanNumber: loan.loan_number,
+							balance: loan.balance || 0,
+							daysOverdue: calculateDaysOverdue(loan.due_date),
+							dueDate: loan.due_date
+						};
+					})
 				});
 			} catch { /* don't block cron job */ }
 		}
@@ -328,8 +341,9 @@ export async function runOverdueCheckJob(): Promise<CronJobResult> {
 
 /**
  * Penalty Calculation Job Handler
- * Applies ONE-TIME penalty after grace period ends
- * Transitions loans from overdue to penalty_accruing
+ * Applies DAILY cumulative penalty after grace period ends (from day 3 onward).
+ * Each day: penaltyRate% × principal is added to the balance.
+ * Transitions loans from overdue → penalty_accruing on first penalty day.
  */
 export async function runPenaltyCalculationJob(): Promise<CronJobResult> {
 	const startTime = Date.now();
@@ -340,9 +354,9 @@ export async function runPenaltyCalculationJob(): Promise<CronJobResult> {
 		const settings = await getLoanSettings();
 		const today = todayISO();
 
-		// Find overdue loans that might need penalty applied
+		// Find overdue loans past grace period (or already in penalty/partially-paid)
 		const overdueLoans = await pb.collection(Collections.Loans).getFullList<LoanWithCustomer>({
-			filter: `(status = "${LoansStatusOptions.overdue}" || status = "${LoansStatusOptions.disbursed}" || status = "${LoansStatusOptions.partially_paid}") && due_date < "${today}"`,
+			filter: `(status = "${LoansStatusOptions.overdue}" || status = "${LoansStatusOptions.penalty_accruing}" || status = "${LoansStatusOptions.disbursed}" || status = "${LoansStatusOptions.partially_paid}") && due_date < "${today}"`,
 			expand: 'customer'
 		});
 
@@ -351,40 +365,55 @@ export async function runPenaltyCalculationJob(): Promise<CronJobResult> {
 				const loanSettings = getLoanSettingsFromSnapshot(loan, settings);
 				const daysOverdue = calculateDaysOverdue(loan.due_date);
 
-				// Check if grace period has ended and penalty not yet applied
-				if (isInPenaltyPeriod(daysOverdue, loanSettings) && loan.status !== LoansStatusOptions.penalty_accruing) {
-					// Calculate ONE-TIME penalty
-					const penalty = calculatePenalty(loan.total_repayment || 0, daysOverdue, loanSettings);
+				if (!isInPenaltyPeriod(daysOverdue, loanSettings)) continue;
 
-					// Only apply if penalty wasn't already applied (check if penalty_start_date is set)
-					if (!loan.penalty_start_date && penalty > 0) {
-						const newBalance = (loan.balance || 0) + penalty;
+				// Calculate what the total cumulative penalty SHOULD be today
+				const expectedTotalPenalty = calculateCumulativePenalty(
+					loan.loan_amount || 0,
+					daysOverdue,
+					loanSettings
+				);
+				const currentPenalty = loan.penalty_amount || 0;
+				const penaltyIncrement = Math.max(0, expectedTotalPenalty - currentPenalty);
 
-						await pb.collection(Collections.Loans).update(loan.id, {
-							status: LoansStatusOptions.penalty_accruing,
-							penalty_amount: penalty,
-							balance: newBalance,
-							penalty_start_date: new Date().toISOString(),
-							days_overdue: daysOverdue
-						});
+				const isFirstPenaltyDay = !loan.penalty_start_date;
 
-						const customer = loan.expand?.customer as CustomersResponse | undefined;
-						const organization = await getOrganization();
+				const updateData: Record<string, unknown> = {
+					status: LoansStatusOptions.penalty_accruing,
+					days_overdue: daysOverdue
+				};
 
-						// Send Penalty Applied Email
+				if (penaltyIncrement > 0) {
+					const newPenalty = currentPenalty + penaltyIncrement;
+					const newBalance = (loan.balance || 0) + penaltyIncrement;
+
+					updateData.penalty_amount = newPenalty;
+					updateData.balance = newBalance;
+
+					if (isFirstPenaltyDay) {
+						updateData.penalty_start_date = new Date().toISOString();
+					}
+
+					await pb.collection(Collections.Loans).update(loan.id, updateData);
+
+					const customer = loan.expand?.customer as CustomersResponse | undefined;
+					const organization = await getOrganization();
+
+					// Send "penalty started" email to customer only on the first day
+					if (isFirstPenaltyDay) {
 						await sendTemplateEmail(
 							TEMPLATE_KEYS.PENALTY_APPLIED,
 							customer?.email || '',
 							{
 								borrower_name: customer?.name.split(' ')[0] || 'Customer',
 								days_overdue: daysOverdue,
-								penalty_amount: formatKES(penalty),
+								penalty_amount: formatKES(penaltyIncrement),
 								new_total_due: formatKES(newBalance),
 								principal_amount: formatKES(loan.loan_amount || 0),
 								interest_amount: formatKES(loan.interest_amount || 0),
 								processing_fee: formatKES(loan.processing_fee || 0),
 								payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-								COMPANY_NAME: organization?.name || 'inuaquicklink'
+								COMPANY_NAME: organization?.name || 'richdencapital'
 							},
 							{
 								customerId: customer?.id,
@@ -392,28 +421,40 @@ export async function runPenaltyCalculationJob(): Promise<CronJobResult> {
 								isAutomated: true
 							}
 						);
-
-						await logSystemAction(
-							`Penalty applied to loan ${loan.loan_number}: ${penalty} (grace period ended)`,
-							ActivitiesEntityTypeOptions.loan,
-							loan.id,
-							{
-								customerId: customer?.id,
-								daysOverdue,
-								penaltyAmount: penalty,
-								newBalance,
-								penaltyRate: loanSettings.penaltyRate
-							}
-						);
-
-						processedCount++;
 					}
-				} else if (loan.status === LoansStatusOptions.penalty_accruing) {
-					// Just update days overdue, penalty is ONE-TIME (already applied)
-					await pb.collection(Collections.Loans).update(loan.id, {
-						days_overdue: daysOverdue
-					});
+
+					// Notify admins every day a penalty is applied
+					await notifyPenaltyApplied({
+						customerName: customer?.name || 'Unknown Customer',
+						customerPhone: customer?.phone,
+						customerEmail: customer?.email,
+						loanNumber: loan.loan_number,
+						penaltyIncrement,
+						totalPenalty: newPenalty,
+						newBalance,
+						daysOverdue
+					}).catch(() => { /* don't block */ });
+
+					await logSystemAction(
+						`Daily penalty applied to loan ${loan.loan_number}: +${formatKES(penaltyIncrement)} (day ${daysOverdue - loanSettings.gracePeriodDays} of penalty, total penalty: ${formatKES(newPenalty)})`,
+						ActivitiesEntityTypeOptions.loan,
+						loan.id,
+						{
+							customerId: customer?.id,
+							daysOverdue,
+							penaltyIncrement,
+							totalPenalty: newPenalty,
+							newBalance,
+							penaltyRate: loanSettings.penaltyRate,
+							isFirstPenaltyDay
+						}
+					);
+				} else {
+					// No new increment (e.g. cron ran twice) — just sync the status/days
+					await pb.collection(Collections.Loans).update(loan.id, updateData);
 				}
+
+				processedCount++;
 			} catch (error) {
 				errors.push(`Failed to calculate penalty for loan ${loan.id}: ${error}`);
 			}
@@ -486,7 +527,7 @@ export async function runDefaultCheckJob(): Promise<CronJobResult> {
 							default_date: formatDate(new Date().toISOString()),
 							days_overdue: daysOverdue,
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name || 'richdencapital'
 						},
 						{
 							customerId: customer?.id,
@@ -501,6 +542,16 @@ export async function runDefaultCheckJob(): Promise<CronJobResult> {
 						loan.id,
 						{ customerId: customer?.id, daysOverdue, balance: loan.balance }
 					);
+
+					// Notify admins with customer contact details
+					await notifyLoanAutoDefaulted({
+						customerName: customer?.name || 'Unknown Customer',
+						customerPhone: customer?.phone,
+						customerEmail: customer?.email,
+						loanNumber: loan.loan_number,
+						outstandingBalance: loan.balance || 0,
+						daysOverdue
+					}).catch(() => { /* don't block */ });
 
 					processedCount++;
 				}
@@ -787,7 +838,7 @@ export async function runPreDueReminderJob(): Promise<CronJobResult> {
 							amount_due: formatKES(loan.balance || 0),
 							balance_remaining: formatKES(loan.balance || 0),
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name || 'richdencapital'
 						},
 						{
 							customerId: customer?.id,
@@ -882,7 +933,7 @@ export async function runUrgentPaymentReminderJob(): Promise<CronJobResult> {
 							balance_remaining: formatKES(loan.balance || 0),
 							grace_period_remaining: loanSettings.gracePeriodDays - daysOverdue,
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name || 'richdencapital'
 						},
 						{
 							customerId: customer?.id,
@@ -953,7 +1004,7 @@ export async function runGracePeriodReminderJob(): Promise<CronJobResult> {
 							balance_remaining: formatKES(loan.balance || 0),
 							penalty_rate: `${(loanSettings.penaltyRate * 100).toFixed(0)}%`,
 							payment_instructions: `Pay via Paybill ${organization?.mpesa_paybill || '123456'}, Account Number ${organization?.account_number || 'Your ID'}`,
-							COMPANY_NAME: organization?.name || 'inuaquicklink'
+							COMPANY_NAME: organization?.name || 'richdencapital'
 						},
 						{
 							customerId: customer?.id,

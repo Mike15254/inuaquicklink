@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -9,38 +8,35 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
-	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { getLoanById, type LoanWithRelations } from '$lib/core/loans/loan_service';
 	import { getLoanPayments, type PaymentWithRelations } from '$lib/core/loans/payment_service';
-	import { getEmailLogsForLoan } from '$lib/services/email/logs';
 	import { getWorkflowStatus } from '$lib/core/loans/workflow_status';
-	import { session, sessionHasPermission } from '$lib/store/session.svelte';
-	import { formatDate, formatDateTime, formatDueStatus } from '$lib/shared/date_time';
-	import { formatKES } from '$lib/shared/currency';
-	import { LoansStatusOptions, type EmailLogsResponse } from '$lib/types';
+	import { getEmailLogsForLoan } from '$lib/services/email/logs';
 	import { Permission } from '$lib/services/roles/permissions';
+	import { formatKES } from '$lib/shared/currency';
+	import { formatDate, formatDueStatus } from '$lib/shared/date_time';
+	import { session, sessionHasPermission } from '$lib/store/session.svelte';
+	import { LoansStatusOptions, type EmailLogsResponse } from '$lib/types';
 	import { toast } from 'svelte-sonner';
-	import type { ActionData } from './$types';
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
 
-	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
-	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
-	import CheckIcon from '@lucide/svelte/icons/check';
-	import XCircleIcon from '@lucide/svelte/icons/x-circle';
-	import SendIcon from '@lucide/svelte/icons/send';
-	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
-	import PercentIcon from '@lucide/svelte/icons/percent';
 	import AlertTriangleIcon from '@lucide/svelte/icons/alert-triangle';
+	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import BanknoteIcon from '@lucide/svelte/icons/banknote';
-	import UserIcon from '@lucide/svelte/icons/user';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
-	import MailIcon from '@lucide/svelte/icons/mail';
-	import ClockIcon from '@lucide/svelte/icons/clock';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import CheckCircleIcon from '@lucide/svelte/icons/check-circle';
 	import CircleIcon from '@lucide/svelte/icons/circle';
 	import CircleDotIcon from '@lucide/svelte/icons/circle-dot';
+	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
+	import LoaderIcon from '@lucide/svelte/icons/loader-circle';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import PercentIcon from '@lucide/svelte/icons/percent';
+	import SendIcon from '@lucide/svelte/icons/send';
+	import UserIcon from '@lucide/svelte/icons/user';
+	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 
 	interface Props {
 		data: PageData;
@@ -246,7 +242,7 @@
 		if (status === LoansStatusOptions.rejected) {
 			return stepId <= 2 ? (stepId === 2 ? 'rejected' : 'complete') : 'pending';
 		}
-		if (status === LoansStatusOptions.defaulted) {
+		if (status === LoansStatusOptions.defaulted || status === LoansStatusOptions.closed) {
 			return stepId <= 4 ? 'complete' : 'defaulted';
 		}
 
@@ -254,7 +250,10 @@
 			pending: 2,
 			approved: 2,
 			disbursed: 4,
+			active: 4,
 			partially_paid: 4,
+			overdue: 4,
+			penalty_accruing: 4,
 			repaid: 5
 		};
 
