@@ -59,7 +59,7 @@ export async function getCustomerContext(
 
 	// Get all active loans for this customer
 	const loansResult = await pb.collection(Collections.Loans).getFullList<LoansResponse>({
-		filter: `customer = "${customerId}" && (status = "disbursed" || status = "partially_paid")`,
+		filter: `customer = "${customerId}" && (status = "disbursed" || status = "partially_paid" || status = "overdue" || status = "penalty_accruing")`,
 		sort: 'due_date'
 	});
 
@@ -90,8 +90,9 @@ export async function getCustomersNeedingFollowUp(
 	// Get loans that are overdue or due within 3 days
 	const threeDaysFromNow = addDays(new Date(), 3).toISOString().split('T')[0];
 
+	const activeStatuses = '(status = "disbursed" || status = "partially_paid" || status = "overdue" || status = "penalty_accruing")';
 	const loansNeedingAttention = await pb.collection(Collections.Loans).getFullList<LoansResponse>({
-		filter: `(status = "disbursed" || status = "partially_paid") && due_date <= "${threeDaysFromNow}"`,
+		filter: `${activeStatuses} && due_date <= "${threeDaysFromNow}"`,
 		expand: 'customer',
 		sort: 'due_date'
 	});
@@ -121,7 +122,7 @@ export async function getOverdueCustomers(
 	const today = todayISO();
 
 	const overdueLoans = await pb.collection(Collections.Loans).getFullList<LoansResponse>({
-		filter: `(status = "disbursed" || status = "partially_paid") && due_date < "${today}"`,
+		filter: `(status = "disbursed" || status = "partially_paid" || status = "overdue" || status = "penalty_accruing" || status = "defaulted") && due_date < "${today}"`,
 		sort: 'due_date'
 	});
 
@@ -370,15 +371,16 @@ export async function getCRMStats(userPermissions: UserPermissions): Promise<CRM
 	const today = todayISO();
 	const sevenDaysFromNow = addDays(new Date(), 7).toISOString().split('T')[0];
 
+	const activeStatuses = '(status = "disbursed" || status = "partially_paid" || status = "overdue" || status = "penalty_accruing")';
 	const [overdueLoans, upcomingLoans, activeLoans] = await Promise.all([
 		pb.collection(Collections.Loans).getList(1, 1, {
-			filter: `(status = "disbursed" || status = "partially_paid") && due_date < "${today}"`
+			filter: `${activeStatuses} && due_date < "${today}"`
 		}),
 		pb.collection(Collections.Loans).getList(1, 1, {
-			filter: `(status = "disbursed" || status = "partially_paid") && due_date >= "${today}" && due_date <= "${sevenDaysFromNow}"`
+			filter: `${activeStatuses} && due_date >= "${today}" && due_date <= "${sevenDaysFromNow}"`
 		}),
 		pb.collection(Collections.Loans).getList(1, 1, {
-			filter: `status = "disbursed" || status = "partially_paid"`
+			filter: activeStatuses
 		})
 	]);
 

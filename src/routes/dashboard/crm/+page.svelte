@@ -19,7 +19,9 @@
 	import { formatKES } from '$lib/shared/currency';
 	import { formatDate, formatDateTime } from '$lib/shared/date_time';
 	import { session } from '$lib/store/session.svelte';
-	import type { CustomersResponse } from '$lib/types';
+	import type { CustomersResponse, EmailLogsResponse } from '$lib/types';
+	import { Collections } from '$lib/types';
+	import { pb } from '$lib/infra/db/pb';
 	import { toast } from 'svelte-sonner';
 	import type { ActionData, PageData } from './$types';
 
@@ -56,6 +58,49 @@
 	let customerSearchResults = $state<CustomersResponse[]>([]);
 	let isSearching = $state(false);
 	let selectedCustomer = $state<CustomersResponse | null>(null);
+
+	// Customer email history
+	let customerEmailHistory = $state<EmailLogsResponse[]>([]);
+	let isLoadingEmails = $state(false);
+	let selectedEmail = $state<EmailLogsResponse | null>(null);
+
+	async function fetchCustomerEmails(customerId: string, customerEmail: string) {
+		isLoadingEmails = true;
+		try {
+			// Run two separate queries and merge — PocketBase OR across relation + text fields can silently return 0
+			const [byId, byEmail] = await Promise.all([
+				pb.collection(Collections.EmailLogs).getList<EmailLogsResponse>(1, 100, {
+					filter: `customer = "${customerId}"`,
+					sort: '-created'
+				}).catch(() => ({ items: [] as EmailLogsResponse[] })),
+				pb.collection(Collections.EmailLogs).getList<EmailLogsResponse>(1, 100, {
+					filter: `recipient_email = "${customerEmail}"`,
+					sort: '-created'
+				}).catch(() => ({ items: [] as EmailLogsResponse[] }))
+			]);
+
+			// Deduplicate by id, sort by created desc
+			const seen = new Set<string>();
+			const merged = [...byId.items, ...byEmail.items]
+				.filter((e) => { if (seen.has(e.id)) return false; seen.add(e.id); return true; })
+				.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+
+			customerEmailHistory = merged;
+		} catch {
+			customerEmailHistory = [];
+		} finally {
+			isLoadingEmails = false;
+		}
+	}
+
+	// Reload email history when selected customer changes
+	$effect(() => {
+		if (selectedCustomer?.id && selectedCustomer?.email) {
+			fetchCustomerEmails(selectedCustomer.id, selectedCustomer.email);
+		} else {
+			customerEmailHistory = [];
+		}
+	});
 
 	// Email compose state
 	let showEmailComposer = $state(false);
@@ -113,7 +158,7 @@
 			return;
 		}
 
-		const orgName = session.organization?.name || 'Inua Quick Link';
+		const orgName = session.organization?.name || 'richdencapital';
 		const orgPhone = session.organization?.phone || '';
 		const orgEmail = session.organization?.email || '';
 
@@ -151,6 +196,10 @@
 				showEmailComposer = false;
 				emailSubject = '';
 				emailBody = '';
+				// Refresh customer email history after sending
+				if (selectedCustomer?.id && selectedCustomer?.email) {
+					fetchCustomerEmails(selectedCustomer.id, selectedCustomer.email);
+				}
 			} else if (form.error) {
 				toast.error(form.error || 'Failed to send email');
 			}
@@ -219,7 +268,7 @@
 </script>
 
 <svelte:head>
-	<title>CRM | Inua Quick Link</title>
+	<title>CRM</title>
 	<meta name="description" content="Customer relationship management" />
 </svelte:head>
 
@@ -232,7 +281,7 @@
 
 	<!-- Stats Cards -->
 	<div
-		class="grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:grid-cols-4 dark:*:data-[slot=card]:bg-card"
+		class="grid grid-cols-2 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:grid-cols-4 dark:*:data-[slot=card]:bg-card"
 	>
 		<Card.Root class="@container/card">
 			<Card.Header>
@@ -286,7 +335,7 @@
 	</div>
 
 	<!-- Main Content -->
-	<div class="grid gap-6 lg:grid-cols-3">
+	<div class="grid gap-6 lg:grid-cols-1">
 		<!-- Left Column: Customer Selection & Actions -->
 		<div class="space-y-4 lg:col-span-1">
 			<!-- Customer Search -->
@@ -368,10 +417,9 @@
 				<Card.Header>
 					<Card.Title>Quick Actions</Card.Title>
 				</Card.Header>
-				<Card.Content class="space-y-2">
+				<Card.Content class="space-y-2 space-x-2 flex flex-row w-full mx-auto">
 					<Button
 						variant="default"
-						class="w-full justify-start"
 						onclick={() => openEmailComposer('custom')}
 						disabled={!selectedCustomer}
 					>
@@ -380,7 +428,6 @@
 					</Button>
 					<Button
 						variant="outline"
-						class="w-full justify-start"
 						onclick={() => openEmailComposer('reminder')}
 						disabled={!selectedCustomer}
 					>
@@ -389,17 +436,15 @@
 					</Button>
 					<Button
 						variant="outline"
-						class="w-full justify-start text-destructive"
+						class=" text-destructive"
 						onclick={() => openEmailComposer('overdue')}
 						disabled={!selectedCustomer}
 					>
 						<AlertTriangleIcon class="mr-2 h-4 w-4" />
 						Overdue Notice
 					</Button>
-					<hr class="my-2" />
 					<Button
 						variant="secondary"
-						class="w-full justify-start"
 						onclick={openScheduler}
 						disabled={!selectedCustomer}
 					>
@@ -514,52 +559,95 @@
 				<Tabs.Content value="history" class="mt-4">
 					<Card.Root>
 						<Card.Header>
-							<Card.Title>Recent Emails</Card.Title>
-							<Card.Description>Communication history</Card.Description>
+							<Card.Title>
+								{#if selectedCustomer}
+									{selectedCustomer.name}'s Email History
+								{:else}
+									Recent Emails
+								{/if}
+							</Card.Title>
+							<Card.Description>
+								{#if selectedCustomer}
+									All emails sent to {selectedCustomer.email}
+								{:else}
+									Select a customer to see their full email history, or browse recent emails below
+								{/if}
+							</Card.Description>
 						</Card.Header>
 						<Card.Content>
-							{#if recentEmails.length === 0}
+							{#if isLoadingEmails}
 								<div class="py-8 text-center">
-									<MailIcon class="mx-auto h-12 w-12 text-muted-foreground/50" />
-									<p class="mt-2 text-sm text-muted-foreground">No emails sent yet</p>
+									<LoaderIcon class="mx-auto h-8 w-8 animate-spin text-muted-foreground/50" />
+									<p class="mt-2 text-sm text-muted-foreground">Loading email history...</p>
 								</div>
 							{:else}
-								<Table.Root>
-									<Table.Header>
-										<Table.Row>
-											<Table.Head>Recipient</Table.Head>
-											<Table.Head class="hidden sm:table-cell">Subject</Table.Head>
-											<Table.Head class="hidden md:table-cell">Date</Table.Head>
-											<Table.Head>Status</Table.Head>
-										</Table.Row>
-									</Table.Header>
-									<Table.Body>
-										{#each recentEmails as email (email.id)}
+								{@const emails = selectedCustomer ? customerEmailHistory : recentEmails}
+								{#if emails.length === 0}
+									<div class="py-8 text-center">
+										<MailIcon class="mx-auto h-12 w-12 text-muted-foreground/50" />
+										<p class="mt-2 text-sm text-muted-foreground">
+											{selectedCustomer ? 'No emails sent to this customer yet' : 'No emails sent yet'}
+										</p>
+									</div>
+								{:else}
+									<Table.Root>
+										<Table.Header>
 											<Table.Row>
-												<Table.Cell class="text-sm font-medium">
-													{email.recipient_email}
-												</Table.Cell>
-												<Table.Cell class="hidden text-sm text-muted-foreground sm:table-cell">
-													{email.subject || 'No subject'}
-												</Table.Cell>
-												<Table.Cell class="hidden text-sm text-muted-foreground md:table-cell">
-													{formatDateTime(email.created)}
-												</Table.Cell>
-												<Table.Cell>
-													<Badge
-														variant={email.status === 'sent'
-															? 'default'
-															: email.status === 'failed'
-																? 'destructive'
-																: 'secondary'}
-													>
-														{email.status}
-													</Badge>
-												</Table.Cell>
+												{#if !selectedCustomer}
+													<Table.Head>Recipient</Table.Head>
+												{/if}
+												<Table.Head>Subject</Table.Head>
+												<Table.Head class="hidden sm:table-cell">Type</Table.Head>
+												<Table.Head class="hidden md:table-cell">Date</Table.Head>
+												<Table.Head>Status</Table.Head>
 											</Table.Row>
-										{/each}
-									</Table.Body>
-								</Table.Root>
+										</Table.Header>
+										<Table.Body>
+											{#each emails as email (email.id)}
+												<Table.Row
+													class="cursor-pointer hover:bg-muted/50"
+													onclick={() => (selectedEmail = email)}
+												>
+													{#if !selectedCustomer}
+														<Table.Cell class="text-sm font-medium">
+															{email.recipient_email}
+														</Table.Cell>
+													{/if}
+													<Table.Cell class="max-w-50 truncate text-sm">
+														{email.subject || 'No subject'}
+													</Table.Cell>
+													<Table.Cell class="hidden sm:table-cell">
+														<Badge variant="outline" class="text-xs capitalize">
+															{(email.email_type || 'custom').replace(/_/g, ' ')}
+														</Badge>
+														{#if email.is_automated}
+															<Badge variant="secondary" class="ml-1 text-xs">Auto</Badge>
+														{/if}
+													</Table.Cell>
+													<Table.Cell class="hidden text-sm text-muted-foreground md:table-cell">
+														{formatDateTime(email.created)}
+													</Table.Cell>
+													<Table.Cell>
+														<Badge
+															variant={email.status === 'sent'
+																? 'default'
+																: email.status === 'failed'
+																	? 'destructive'
+																	: 'secondary'}
+														>
+															{email.status}
+														</Badge>
+													</Table.Cell>
+												</Table.Row>
+											{/each}
+										</Table.Body>
+									</Table.Root>
+									{#if selectedCustomer}
+										<p class="mt-3 text-xs text-muted-foreground">
+										Showing {emails.length} email{emails.length !== 1 ? 's' : ''} (most recent 100)
+										</p>
+									{/if}
+								{/if}
 							{/if}
 						</Card.Content>
 					</Card.Root>
@@ -616,7 +704,7 @@
 							<Label for="emailBody">Message</Label>
 							<textarea
 								id="emailBody"
-								class="min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+								class="min-h-50 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
 								placeholder="Write your message..."
 								bind:value={emailBody}
 							></textarea>
@@ -715,6 +803,67 @@
 						Schedule
 					</Button>
 				</Card.Footer>
+			</Card.Root>
+		</div>
+	{/if}
+
+	<!-- Email Detail Modal -->
+	{#if selectedEmail}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+			onclick={() => (selectedEmail = null)}
+			onkeydown={(e) => e.key === 'Escape' && (selectedEmail = null)}
+			tabindex="-1"
+			role="dialog"
+			aria-modal="true"
+		>
+			<Card.Root
+				class="max-h-[90vh] w-full max-w-2xl overflow-hidden flex flex-col"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<Card.Header class="border-b">
+					<div class="flex items-start justify-between gap-4">
+						<div class="min-w-0 flex-1">
+							<Card.Title class="truncate text-base">
+								{selectedEmail.subject || 'No subject'}
+							</Card.Title>
+							<Card.Description class="mt-1 space-y-0.5">
+								<p>To: {selectedEmail.recipient_email}</p>
+								<p>{formatDateTime(selectedEmail.created)}</p>
+							</Card.Description>
+						</div>
+						<div class="flex shrink-0 items-center gap-2">
+							<Badge
+								variant={selectedEmail.status === 'sent'
+									? 'default'
+									: selectedEmail.status === 'failed'
+										? 'destructive'
+										: 'secondary'}
+							>
+								{selectedEmail.status}
+							</Badge>
+							{#if selectedEmail.is_automated}
+								<Badge variant="secondary">Auto</Badge>
+							{/if}
+							<Button variant="ghost" size="sm" onclick={() => (selectedEmail = null)}>
+								<XIcon class="h-4 w-4" />
+							</Button>
+						</div>
+					</div>
+				</Card.Header>
+				<Card.Content class="flex-1 overflow-y-auto p-0">
+					<iframe
+						title="Email content"
+						srcdoc={selectedEmail.body}
+						class="h-full min-h-100 w-full border-0"
+						sandbox="allow-same-origin"
+					></iframe>
+				</Card.Content>
+				{#if selectedEmail.error_message}
+					<div class="border-t bg-destructive/10 px-6 py-3 text-sm text-destructive">
+						Error: {selectedEmail.error_message}
+					</div>
+				{/if}
 			</Card.Root>
 		</div>
 	{/if}
